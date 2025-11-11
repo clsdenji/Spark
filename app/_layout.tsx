@@ -8,15 +8,12 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 
-// Catch any errors thrown by the Layout component
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: 'index',
+  initialRouteName: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -25,18 +22,10 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Handle font loading error
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  // Hide splash screen once fonts are ready
-  useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
+  useEffect(() => { if (error) throw error; }, [error]);
+  useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
 
   if (!loaded) return null;
-
   return <RootLayoutNav />;
 }
 
@@ -45,11 +34,13 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      {/* Hide headers globally OR per screen */}
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* If you keep index/auth screens, they’re headerless too */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="auth/LoginPage" options={{ headerShown: false }} />
-          <Stack.Screen name="auth/ForgotPassword" options={{ headerShown: false }} />
-          <Stack.Screen name="auth/NewPassword" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        {/* This is the important one — hide the "(tabs)" header */}
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '' }} />
       </Stack>
     </ThemeProvider>
   );
