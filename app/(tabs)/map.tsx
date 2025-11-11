@@ -1,12 +1,16 @@
 // app/(tabs)/map.tsx
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import SmoothScreen from "./components/SmoothScreen";
+
 
 export default function MapScreen() {
   return (
+    <SmoothScreen>
     <View style={styles.container}>
       <Text style={styles.text}>Map</Text>
     </View>
+    </SmoothScreen>
   );
 }
 

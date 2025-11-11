@@ -1,12 +1,16 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import SmoothScreen from "./components/SmoothScreen";
+
 
 export default function SavedScreen() {
   return (
+    <SmoothScreen>
     <View style={styles.container}>
       <Text style={styles.text}>Saved</Text>
       <Text style={styles.sub}>Your saved parking spots will appear here.</Text>
     </View>
+    </SmoothScreen>
   );
 }
 
