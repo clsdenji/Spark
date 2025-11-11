@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Main",
-    "slug": "Main",
+    "name": "Spark",
+    "slug": "Spark",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,10 +11,13 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Spark needs your location to show nearby parking areas."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +25,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "package": "com.cstdenji.Main"
     },
     "web": {
       "bundler": "metro",
@@ -30,10 +38,21 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      "expo-location",
       "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "SUPABASE_URL": "https://fakqwgyvbqhonwfufhxg.supabase.co",
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZha3F3Z3l2YnFob253ZnVmaHhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NjA3MTAsImV4cCI6MjA3ODQzNjcxMH0.JSOO1EZIc810xgkTIeh8WaNWjvgRm64Nim2eVCRQRy4",
+      "router": {},
+      "eas": {
+        "projectId": "fakqwgyvbqhonwfufhxg"
+      }
     }
   }
 }
