@@ -1,3 +1,4 @@
+// app/(tabs)/CustomNavBar.tsx
 import React, { memo } from "react";
 import { View, TouchableOpacity, StyleSheet, Text } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
@@ -136,12 +137,7 @@ const styles = StyleSheet.create({
     bottom: 6,
     height: 18,
     width: "80%",
-    borderRadius: 40,
-    backgroundColor: GOLD_GLOW,
-    opacity: 0.4,
-    shadowColor: GOLD,
-    shadowOpacity: 0.7,
-    shadowRadius: 20,
+    borderRadius: 40
   },
 });
 

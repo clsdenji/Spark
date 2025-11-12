@@ -1,34 +1,231 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  SafeAreaView,
+  Dimensions,
+  Platform,
+  StatusBar,
+  Alert,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import SmoothScreen from "./components/SmoothScreen";
+import { getSearchHistory, subscribeSearchHistory, clearSearchHistory, SearchEntry } from "../services/searchHistory";
+
+const RECENT_SEARCHES_KEY = "recent_searches_v1";
+
+// Responsive helpers
+const { width, height } = Dimensions.get("window");
+const WP = (pct: number) => Math.round((width * pct) / 100);
+const HP = (pct: number) => Math.round((height * pct) / 100);
+
+type RecentItem = { id: string; name: string; address?: string; lat?: number; lng?: number; timestamp: number };
 
 export default function HistoryScreen() {
+  const [items, setItems] = useState<SearchEntry[]>(() => getSearchHistory());
+
+  useEffect(() => {
+    const unsub = subscribeSearchHistory((h) => setItems(h));
+    return () => unsub();
+  }, []);
+
+  const clearAll = async () => {
+    Alert.alert("Clear history", "Remove all recent searches?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+          } catch (e) {
+            console.warn("Failed to remove AsyncStorage key", e);
+          }
+          try {
+            clearSearchHistory();
+          } catch (e) {
+            console.warn("Failed to clear in-memory history", e);
+          }
+          setItems([]);
+        },
+      },
+    ]);
+  };
+
+  const renderItem = ({ item }: { item: SearchEntry }) => {
+    const time = new Date(item.timestamp).toLocaleString();
+    return (
+      <TouchableOpacity style={styles.squareItem} activeOpacity={0.9}>
+        <View style={styles.squareContent}>
+          <Text
+            style={styles.squareName}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            allowFontScaling
+          >
+            {item.name}
+          </Text>
+          <Text
+            style={styles.squareSub}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            allowFontScaling
+          >
+            {item.address ? item.address : item.lat && item.lng ? `${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}` : ""}
+          </Text>
+        </View>
+        <Text style={styles.squareTime} numberOfLines={1} allowFontScaling>
+          {time}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SmoothScreen>
-      <View style={styles.container}>
-        <Text style={styles.text}>History</Text>
-        <Text style={styles.sub}>Your recent visits and activity will show here.</Text>
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.container}>
+          <View style={styles.headerRow}>
+            <Text style={styles.recentTitle}>Recent Searches</Text>
+            <TouchableOpacity onPress={clearAll} style={styles.clearButton}>
+              <Text style={styles.clearText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+
+          {items.length === 0 ? (
+            <Text style={styles.empty}>No searches yet — search on the Map tab.</Text>
+          ) : (
+            <FlatList
+              data={items}
+              keyExtractor={(i) => i.id}
+              renderItem={renderItem}
+              numColumns={2}
+              columnWrapperStyle={styles.columnWrapper}
+              contentContainerStyle={{ paddingBottom: HP(3) }}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      </SafeAreaView>
     </SmoothScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#000", 
-    justifyContent: "center", 
-    alignItems: "center", 
-    padding: 20 
+  safe: { flex: 1, backgroundColor: "#000", paddingTop: Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0 },
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingHorizontal: WP(4),
+    paddingTop: HP(1.5),
   },
-  text: { 
-    color: "#7ED957", 
-    fontSize: 24, 
-    fontWeight: "700", 
-    marginBottom: 8 
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: HP(1.5),
   },
-  sub: { 
-    color: "#ccc", 
-    textAlign: "center" 
+  recentTitle: {
+    color: "#7ED957",
+    fontSize: Math.max(18, WP(5)),
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  clearButton: {
+    paddingHorizontal: WP(3),
+    paddingVertical: HP(0.7),
+    borderRadius: 6,
+    backgroundColor: "#222",
+  },
+  clearText: {
+    color: "#FFD166",
+    fontWeight: "700",
+    fontSize: Math.max(12, WP(3.5)),
+  },
+  empty: {
+    color: "#888",
+    textAlign: "center",
+    marginTop: HP(3),
+    fontSize: Math.max(13, WP(3.8)),
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
+    marginBottom: HP(1.2),
+  },
+
+  // square item styles
+  squareItem: {
+    width: "48%",            // two items per row
+    aspectRatio: 1.05,       // slightly taller than wide
+    marginBottom: HP(1.2),
+    borderRadius: Math.round(WP(2)),
+    backgroundColor: "#0d0d0d",
+    padding: WP(3),
+    justifyContent: "space-between",
+     // subtle elevation/shadow
+     ...Platform.select({
+       ios: {
+         shadowColor: "#000",
+         shadowOffset: { width: 0, height: 4 },
+         shadowOpacity: 0.25,
+         shadowRadius: 6,
+       },
+       android: {
+         elevation: 3,
+       },
+     }),
+  },
+  squareContent: {
+    flex: 1,
+    justifyContent: "flex-start",
+  },
+  squareName: {
+    color: "#FFD166",
+    fontSize: Math.max(14, WP(4.2)),
+    fontWeight: "700",
+    marginBottom: HP(0.6),
+    flexShrink: 1,
+    includeFontPadding: false,
+  },
+  squareSub: {
+    color: "#aaa",
+    fontSize: Math.max(11, WP(3.6)),
+    flexShrink: 1,
+  },
+  squareTime: {
+    color: "#888",
+    fontSize: Math.max(10, WP(3.4)),
+    alignSelf: "flex-end",
+  },
+
+  // legacy row styles left for compatibility (unused)
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: HP(1.6),
+    paddingHorizontal: WP(2.5),
+    borderRadius: Math.round(WP(2)),
+    backgroundColor: "#0d0d0d",
+    marginBottom: HP(0.8),
+  },
+  name: {
+    color: "#FFD166",
+    fontSize: Math.max(14, WP(4.2)),
+    fontWeight: "700",
+  },
+  sub: {
+    color: "#aaa",
+    fontSize: Math.max(11, WP(3.6)),
+    marginTop: HP(0.4),
+  },
+  time: {
+    color: "#888",
+    fontSize: Math.max(10, WP(3.4)),
+    marginLeft: WP(3),
   },
 });

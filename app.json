@@ -1,27 +1,29 @@
 {
   "expo": {
-    "name": "Spark",
-    "slug": "Spark",
+    "name": "SPARK",
+    "slug": "SPARK",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "main",
+  "icon": "./assets/images/app_icon.jpg",
+  "scheme": "SPARK",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/app_icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Spark needs your location to show nearby parking areas."
+        "NSLocationWhenInUseUsageDescription": "Spark needs your location to show nearby parking areas.",
+        "UIBackgroundModes": ["location"],
+        "NSLocationAlwaysUsageDescription": "Spark needs your location to provide accurate parking spot information."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/app_icon.jpg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -30,7 +32,12 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.cstdenji.Main"
+      "package": "com.cstdenji.Main",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -52,7 +59,8 @@
       "router": {},
       "eas": {
         "projectId": "fakqwgyvbqhonwfufhxg"
-      }
+      },
+      "googleMapsApiKey": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0"
     }
   }
 }

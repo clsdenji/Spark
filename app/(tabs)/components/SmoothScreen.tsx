@@ -1,49 +1,40 @@
-import React, { PropsWithChildren, useEffect } from "react";
-import { Platform } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
+// app/(tabs)/components/SmoothScreen.tsx
+import React, { PropsWithChildren } from "react";
+import { View, StyleSheet } from "react-native";
 import Animated, {
-  Easing,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
+  FadeInDown,
+  FadeOutUp,
+  Layout,
+  ZoomIn,
+  ZoomOut,
 } from "react-native-reanimated";
+import { useIsFocused } from "@react-navigation/native";
 
-type Props = PropsWithChildren<{
-  duration?: number;      // default 220ms
-  offset?: number;        // default 8px vertical slide
-  easing?: (v: number) => number;
-}>;
-
-export default function SmoothScreen({
-  children,
-  duration = 220,
-  offset = 8,
-  easing = Easing.out(Easing.cubic),
-}: Props) {
-  const isFocused = useIsFocused();
-  const progress = useSharedValue(0);
-
-  useEffect(() => {
-    // Animate to 1 when focused, to 0 when blurred
-    progress.value = withTiming(isFocused ? 1 : 0, { duration, easing });
-  }, [isFocused]);
-
-  const animStyle = useAnimatedStyle(() => {
-    return {
-      opacity: progress.value,
-      transform: [
-        { translateY: withTiming((1 - progress.value) * offset, { duration }) },
-      ],
-    };
-  });
-
-  // On Android, keep view mounted but invisible to avoid flashing on tab change
-  const pointerEvents =
-    Platform.OS === "android" ? (isFocused ? "auto" : "none") : "auto";
+export default function SmoothScreen({ children }: PropsWithChildren) {
+  const focused = useIsFocused();
 
   return (
-    <Animated.View style={[{ flex: 1 }, animStyle]} pointerEvents={pointerEvents}>
-      {children}
+    <Animated.View
+      key={focused ? "focused" : "blurred"}
+      // handles the fade/translate
+      entering={FadeInDown.duration(240)}
+      exiting={FadeOutUp.duration(180)}
+      layout={Layout.springify().damping(14).stiffness(160)}
+      style={styles.root}
+    >
+      {/* inner layer handles the zoom */}
+      <Animated.View
+        entering={ZoomIn.duration(200).springify().damping(16).stiffness(140)}
+        exiting={ZoomOut.duration(180).springify().damping(18).stiffness(160)}
+        style={styles.content}
+      >
+        {children}
+      </Animated.View>
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#000" },
+  content: { flex: 1 },
+});

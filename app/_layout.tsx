@@ -11,9 +11,10 @@ import { useColorScheme } from '@/components/useColorScheme';
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  initialRouteName: '(tabs)',  // Ensure the default route is set
 };
 
+// Prevent splash screen auto-hide
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -22,24 +23,31 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  useEffect(() => { if (error) throw error; }, [error]);
-  useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
+  // Check for font loading errors
+  useEffect(() => {
+    if (error) throw error;
+  }, [error]);
 
+  // Hide the splash screen once the fonts are loaded
+  useEffect(() => {
+    if (loaded) SplashScreen.hideAsync();
+  }, [loaded]);
+
+  // Return nothing until fonts are loaded
   if (!loaded) return null;
+
   return <RootLayoutNav />;
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme();  // Custom hook for detecting theme
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      {/* Hide headers globally OR per screen */}
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* If you keep index/auth screens, they’re headerless too */}
+      <Stack screenOptions={{ animation: 'fade' }}>
+        {/* Define stack screens and apply fade transition */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
-        {/* This is the important one — hide the "(tabs)" header */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '' }} />
       </Stack>
     </ThemeProvider>

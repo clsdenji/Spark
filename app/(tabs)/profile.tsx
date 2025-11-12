@@ -4,7 +4,6 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Ale
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "../services/supabaseClient";
 import { useRouter } from "expo-router";
-import SmoothScreen from "./components/SmoothScreen";
 
 
 const GOLD = "#FFDE59";
@@ -85,7 +84,6 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SmoothScreen>
     <LinearGradient colors={["#000000", "#0a0a0a", "#000000"]} style={styles.container}>
       <View style={styles.centerContent}>
         {/* Avatar bubble */}
@@ -159,7 +157,6 @@ export default function ProfileScreen() {
         )}
       </View>
     </LinearGradient>
-    </SmoothScreen>
   );
 }
 
