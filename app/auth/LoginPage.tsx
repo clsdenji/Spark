@@ -18,6 +18,7 @@ import { useFonts } from "expo-font";
 import { Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { Roboto_400Regular } from "@expo-google-fonts/roboto";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../services/supabaseClient";
 
 const GOLD = "#FFDE59";
@@ -43,7 +44,8 @@ export default function LoginPage() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const scaleAnim = useRef(new Animated.Value(0.98)).current;
-  const glowAnim = useRef(new Animated.Value(0.9)).current;
+  // Native-driver friendly glow opacity used by a gradient overlay
+  const glowOpacity = useRef(new Animated.Value(0.9)).current;
   const heartbeat = useRef(new Animated.Value(1)).current;
   const errorFade = useRef(new Animated.Value(0)).current;
 
@@ -61,17 +63,17 @@ export default function LoginPage() {
     return () => loop.stop();
   }, [heartbeat]);
 
-  // Glow animation (shadowOpacity can't use native driver)
+  // Glow animation (use opacity on a gradient layer so it can use native driver on both platforms)
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 2000, useNativeDriver: false }),
-        Animated.timing(glowAnim, { toValue: 0.9, duration: 2000, useNativeDriver: false }),
+        Animated.timing(glowOpacity, { toValue: 1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(glowOpacity, { toValue: 0.9, duration: 2000, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [glowAnim]);
+  }, [glowOpacity]);
 
   // Animate entry
   useEffect(() => {
@@ -151,8 +153,8 @@ export default function LoginPage() {
       if (error) {
         Alert.alert("Login failed", error.message);
       } else {
-        // ✅ AFTER LOGIN → GO TO TABS/MAP
-        router.replace("/(tabs)/map");
+        // Show onboarding on every successful login
+        router.replace("/auth/Onboarding");
       }
     } else {
       const { data, error } = await supabase.auth.signUp({
@@ -210,12 +212,20 @@ export default function LoginPage() {
                 styles.glowWrap,
                 {
                   transform: [
-                    { scale: glowAnim.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
+                    { scale: glowOpacity.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
                   ],
-                  shadowOpacity: glowAnim as unknown as number,
                 },
               ]}
             >
+              {/* Simulated glow layer */}
+              <Animated.View style={[styles.glowLayer, { opacity: glowOpacity }]} pointerEvents="none">
+                <LinearGradient
+                  colors={[GREEN + "33", GOLD + "22", "transparent"]}
+                  start={{ x: 0.3, y: 0 }}
+                  end={{ x: 0.7, y: 1 }}
+                  style={styles.glowGradient}
+                />
+              </Animated.View>
               <LinearGradient
                 colors={[GOLD, GREEN]}
                 start={{ x: 0, y: 0 }}
@@ -354,6 +364,16 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
   },
+  glowLayer: {
+    position: "absolute",
+    top: -20,
+    left: -20,
+    right: -20,
+    bottom: -20,
+    borderRadius: 60,
+    overflow: "hidden",
+  },
+  glowGradient: { flex: 1, borderRadius: 60 },
   cardWrapper: {
     width: "100%",
     borderRadius: 50,

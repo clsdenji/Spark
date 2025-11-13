@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Keyboard } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { getDistance } from 'geolib';
 import { Feather, Entypo } from '@expo/vector-icons';
 import { addSearch } from '../services/searchHistory';
+
+const GOLD = '#FFDE59';
+const GRAY = '#9CA3AF';
 
 type Place = { name: string; lat: number; lon: number; distanceKm?: number };
 
@@ -285,6 +289,7 @@ const MapScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={[styles.searchContainer, { top: hasDistance ? 78 : 24 }]} pointerEvents="box-none">
+        <LinearGradient colors={[GOLD, GRAY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.searchCardBorder}>
         <View style={styles.searchCard}>
           <View style={styles.fieldsCol}>
             <View style={styles.row}>
@@ -353,7 +358,8 @@ const MapScreen: React.FC = () => {
               <Entypo name="swap" size={18} color="#FFD166" />
             </TouchableOpacity>
           </View>
-        </View>
+  </View>
+  </LinearGradient>
 
         {searchResults.length > 0 && (
           <ScrollView style={styles.resultsContainer} keyboardShouldPersistTaps="handled">
@@ -397,6 +403,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
   searchContainer: { position: 'absolute', top: 78, left: 20, right: 20, zIndex: 900, elevation: 5 },
+  searchCardBorder: { borderRadius: 16, padding: 2 },
   searchCard: { flexDirection: 'row', backgroundColor: '#000', borderRadius: 14, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'stretch' },
   fieldsCol: { flex: 1, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 4, borderRadius: 8 },

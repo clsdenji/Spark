@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { Roboto_400Regular } from "@expo-google-fonts/roboto";
@@ -43,7 +44,7 @@ export default function ForgotPasswordScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const scaleAnim = useRef(new Animated.Value(0.98)).current;
-  const glowAnim = useRef(new Animated.Value(0.9)).current;
+  const glowOpacity = useRef(new Animated.Value(0.9)).current;
 
   const [fontsLoaded] = useFonts({ Poppins_700Bold, Roboto_400Regular });
 
@@ -56,8 +57,8 @@ export default function ForgotPasswordScreen() {
 
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 2000, useNativeDriver: false }),
-        Animated.timing(glowAnim, { toValue: 0.9, duration: 2000, useNativeDriver: false }),
+        Animated.timing(glowOpacity, { toValue: 1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(glowOpacity, { toValue: 0.9, duration: 2000, useNativeDriver: true }),
       ])
     );
     loop.start();
@@ -78,8 +79,8 @@ export default function ForgotPasswordScreen() {
     setSending(true);
     try {
       await supabase.auth.resetPasswordForEmail(email, {
-        // Local dev with Expo Dev Client — update to your prod scheme/domain later
-        redirectTo: "exp+main://reset",
+        // Deep link directly into the NewPassword screen
+        redirectTo: Linking.createURL("/auth/NewPassword"),
       });
 
       // Censor email locally for UI
@@ -114,12 +115,20 @@ export default function ForgotPasswordScreen() {
               styles.glowWrap, // same “bubble” container as Login
               {
                 transform: [
-                  { scale: glowAnim.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
+                  { scale: glowOpacity.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
                 ],
-                shadowOpacity: glowAnim as unknown as number,
               },
             ]}
           >
+            {/* Simulated glow layer */}
+            <Animated.View style={[styles.glowLayer, { opacity: glowOpacity }]} pointerEvents="none">
+              <LinearGradient
+                colors={[GREEN + "33", GOLD + "22", "transparent"]}
+                start={{ x: 0.3, y: 0 }}
+                end={{ x: 0.7, y: 1 }}
+                style={styles.glowGradient}
+              />
+            </Animated.View>
             <LinearGradient
               colors={[GOLD, GREEN]}
               start={{ x: 0, y: 0 }}
@@ -244,6 +253,16 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
   },
+  glowLayer: {
+    position: "absolute",
+    top: -20,
+    left: -20,
+    right: -20,
+    bottom: -20,
+    borderRadius: 60,
+    overflow: "hidden",
+  },
+  glowGradient: { flex: 1, borderRadius: 60 },
   cardWrapper: {
     width: "100%",
     borderRadius: 50,

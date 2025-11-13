@@ -1,13 +1,15 @@
 // app/(tabs)/profile.tsx
-import React, { useEffect, useState } from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Animated, Easing, TextInput, ScrollView } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "../services/supabaseClient";
 import { useRouter } from "expo-router";
 
 
 const GOLD = "#FFDE59";
-const GREEN = "#7ED957";
+const GREEN = "#9CA3AF"; // neutral gray accent
+const LOGOUT_GREEN = "#7ED957"; // subtle green for logout pill
 
 const AVATARS = [
   { key: "avatar1", url: "https://fakqwgyvbqhonwfufhxg.supabase.co/storage/v1/object/sign/avatars/avatar1.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWZlNGUwNi0zNTA1LTQ2YmUtYTgzZi1jMzAzY2Q4MzE2YjMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJhdmF0YXJzL2F2YXRhcjEucG5nIiwiaWF0IjoxNzYyODgzODQ5LCJleHAiOjE3OTQ0MTk4NDl9.ibrb-VmSpLWCl3jrS-nrcRbSleVS3tiSPtdOJCfWkCg" },
@@ -23,7 +25,93 @@ export default function ProfileScreen() {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
   const router = useRouter();
+
+  // Live preview: prefer selected avatar if present
+  const previewAvatarUrl = selectedAvatar || avatarUrl;
+
+  // Subtle pulsing glow for the avatar
+  const glowScale = useRef(new Animated.Value(1)).current;
+  const glowOpacity = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(glowScale, {
+            toValue: 1.06,
+            duration: 1600,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowScale, {
+            toValue: 1,
+            duration: 1600,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(glowOpacity, {
+            toValue: 0.5,
+            duration: 1600,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowOpacity, {
+            toValue: 0.3,
+            duration: 1600,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [glowOpacity, glowScale]);
+
+  // Spark loading animation (neon breathing)
+  const sparkScale = useRef(new Animated.Value(1)).current;
+  const sparkGlowOpacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(sparkScale, {
+            toValue: 1.06,
+            duration: 1100,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(sparkScale, {
+            toValue: 0.94,
+            duration: 1100,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(sparkGlowOpacity, {
+            toValue: 0.55,
+            duration: 1100,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(sparkGlowOpacity, {
+            toValue: 0.25,
+            duration: 1100,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sparkScale, sparkGlowOpacity]);
 
   // Load user + profile
   useEffect(() => {
@@ -44,6 +132,7 @@ export default function ProfileScreen() {
       if (!error && profile) {
         if (profile.avatar_url) setAvatarUrl(profile.avatar_url);
         if (profile.full_name) setFullName(profile.full_name);
+        setNameInput(profile.full_name || "");
       }
       setLoading(false);
     })();
@@ -75,25 +164,89 @@ export default function ProfileScreen() {
     router.replace("/auth/LoginPage");
   };
 
+  const handleSaveName = async () => {
+    if (!user) return;
+    const value = nameInput.trim();
+    if (!value) {
+      Alert.alert("Name required", "Please enter your name.");
+      return;
+    }
+    try {
+      setNameSaving(true);
+      const { error } = await supabase
+        .from("users")
+        .update({ full_name: value })
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setFullName(value);
+      setEditingName(false);
+      Alert.alert("Saved", "Your name has been updated!");
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to update name.");
+    } finally {
+      setNameSaving(false);
+    }
+  };
+
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: "center" }]}>
-        <ActivityIndicator size="large" color={GREEN} />
+      <View style={styles.loadingContainer}>
+        <Animated.Text style={[styles.sparkText, { transform: [{ scale: sparkScale }] }]}>
+          ⚡
+        </Animated.Text>
       </View>
     );
   }
 
   return (
     <LinearGradient colors={["#000000", "#0a0a0a", "#000000"]} style={styles.container}>
-      <View style={styles.centerContent}>
-        {/* Avatar bubble */}
-        <TouchableOpacity onPress={() => setChoosing(true)} activeOpacity={0.8}>
+      {/* Full-bleed cover to fill top/bottom spaces */}
+      <Image
+        source={require("@/assets/images/profile_bg.jpg")}
+        style={styles.bgImageFill}
+        resizeMode="cover"
+      />
+      {/* Background image with 80% opacity */}
+      <View style={styles.bgImageContainer}>
+        <Image
+          source={require("@/assets/images/profile_bg.jpg")}
+          style={styles.bgImage}
+          resizeMode="center"
+        />
+      </View>
+      <ScrollView contentContainerStyle={styles.centerContentScroll} showsVerticalScrollIndicator={false}>
+        {/* Avatar bubble with gradient ring + glossy shine + pulsing glow */}
+        <TouchableOpacity onPress={() => setChoosing(true)} activeOpacity={0.9}>
           <View style={styles.avatarWrap}>
-            <Image
-              source={avatarUrl ? { uri: avatarUrl } : require("@/assets/images/icon.png")}
-              style={styles.avatar}
-            />
-            <LinearGradient colors={[GOLD, GREEN]} style={styles.glow} />
+            {/* Pulsing aura behind the ring */}
+            <Animated.View
+              style={[
+                styles.glow,
+                {
+                  transform: [{ scale: glowScale }],
+                  opacity: glowOpacity,
+                },
+              ]}
+            >
+              <LinearGradient colors={[GOLD, GREEN]} style={[StyleSheet.absoluteFill, styles.glowGradient]} />
+            </Animated.View>
+
+            {/* Gradient ring border */}
+            <LinearGradient colors={[GOLD, GREEN]} style={styles.avatarBorder}>
+              <View style={styles.avatarInner}>
+                <Image
+                  source={previewAvatarUrl ? { uri: previewAvatarUrl } : require("@/assets/images/icon.png")}
+                  style={styles.avatar}
+                />
+                {/* Glossy highlight */}
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.45)", "rgba(255,255,255,0.1)", "transparent"]}
+                  start={{ x: 0.1, y: 0.0 }}
+                  end={{ x: 0.9, y: 0.9 }}
+                  style={styles.shine}
+                />
+              </View>
+            </LinearGradient>
           </View>
         </TouchableOpacity>
 
@@ -105,9 +258,9 @@ export default function ProfileScreen() {
               disabled={!selectedAvatar || saving}
               style={[styles.primaryBtnWrap, (!selectedAvatar || saving) && { opacity: 0.6 }]}
             >
-              <LinearGradient colors={[GOLD, GREEN]} style={styles.primaryBtn}>
-                <Text style={styles.primaryText}>{saving ? "Saving..." : "Save"}</Text>
-              </LinearGradient>
+              <View style={styles.saveOutlineBtn}>
+                <Text style={styles.saveOutlineText}>{saving ? "Saving..." : "Save"}</Text>
+              </View>
             </TouchableOpacity>
 
             <Text style={styles.chooseText}>
@@ -132,59 +285,292 @@ export default function ProfileScreen() {
                 setChoosing(false);
                 setSelectedAvatar(null);
               }}
-              style={styles.cancelBtn}
+              style={styles.cancelOutlineGreen}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelOutlineTextGreen}>Cancel</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Hide these while choosing */}
         {!choosing && (
-          <>
-            <Text style={styles.name}>{fullName || "Spark User"}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
+          <View style={styles.contentBlock}>
+            <View style={styles.nameOutline}>
+              {!editingName ? (
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{`${fullName || "Spark User"} ⚡`}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setNameInput(fullName || "");
+                      setEditingName(true);
+                    }}
+                    style={styles.editIconBtn}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Edit name"
+                  >
+                    <MaterialCommunityIcons name="pencil" size={16} color={GOLD} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.nameEditor}>
+                  <TextInput
+                    value={nameInput}
+                    onChangeText={setNameInput}
+                    placeholder="Enter your name"
+                    placeholderTextColor="#777"
+                    style={styles.nameInput}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSaveName}
+                    maxLength={64}
+                  />
+                  <View style={styles.nameActions}>
+                    <TouchableOpacity
+                      onPress={handleSaveName}
+                      disabled={nameSaving}
+                      style={[styles.primaryBtnWrap, nameSaving && { opacity: 0.6 }, { marginBottom: -13 }]}
+                    >
+                      <View style={styles.saveOutlineBtnGreen}>
+                        <Text style={styles.saveOutlineTextGreen}>{nameSaving ? "Saving..." : "Save"}</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setEditingName(false)}
+                      disabled={nameSaving}
+                      style={[styles.cancelOutlineGreen, { marginTop: 2 }]}
+                    >
+                      <Text style={styles.cancelOutlineTextGreen}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
-            {/* 🔻 Pill logout UI (your bubble-as-pill) */}
-            <View style={styles.logoutBubble}>
-              <LinearGradient colors={[GOLD, GREEN]} style={styles.logoutBubbleInner}>
-                <TouchableOpacity onPress={handleLogout} activeOpacity={0.9} style={{ width: "100%", height: "100%", alignItems: "center", justifyContent: "center" }}>
-                  <Text style={styles.logoutText}>Log Out</Text>
-                </TouchableOpacity>
-              </LinearGradient>
+              {!editingName && (
+                <Text style={[styles.email, { marginBottom: 0 }]}>{user?.email}</Text>
+              )}
             </View>
-          </>
+
+            {/* 🔻 Pill logout UI (outlined gradient, no fill) */}
+            {!editingName && (
+              <View style={styles.logoutBubble}>
+                <View style={styles.logoutOutlineNeutral}>
+                  <TouchableOpacity onPress={handleLogout} activeOpacity={0.9} style={styles.logoutHollow}>
+                    <Text style={styles.logoutTextNeutral}>Log Out</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
         )}
-      </View>
+      </ScrollView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   centerContent: { alignItems: "center", width: "100%" },
+  sparkGlowNeon: {
+    position: "absolute",
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    overflow: "hidden",
+  },
+  sparkGlowNeonGradient: {
+    borderRadius: 42,
+  },
+  sparkText: {
+    fontSize: 44,
+    color: GOLD,
+    textAlign: "center",
+    // Neon glow around the bolt (both platforms)
+    textShadowColor: "rgba(255, 222, 89, 0.75)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
+  },
+  bgImageContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "none",
+  },
+  bgImageFill: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.35,
+    pointerEvents: "none",
+  },
+  bgImage: {
+    opacity: 0.8,
+  },
+  centerContentScroll: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  contentBlock: {
+    width: "86%",
+    maxWidth: 400,
+    alignSelf: "center",
+    alignItems: "center",
+  },
+  nameOutline: {
+    width: "100%",
+    borderRadius: 20,
+    borderWidth: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 10,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  infoCardBorder: {
+    width: "100%",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 10,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  infoCard: {
+    width: "100%",
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    width: "100%",
+  },
+  editIconBtn: { marginLeft: 2, padding: 4, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  editNameBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GOLD,
+    marginLeft: 8,
+  },
+  editNameText: { color: GOLD, fontWeight: "700", fontSize: 12 },
+  nameEditor: { width: "100%", maxWidth: 400, alignItems: "center", marginTop: 6, marginBottom: 10 },
+  nameInput: {
+    width: "100%",
+    backgroundColor: "#0f0f0f",
+    borderColor: "#333",
+    borderWidth: 1,
+    color: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
+  nameActions: { width: "100%", alignItems: "center", marginTop: 10, marginBottom: 8 },
 
   avatarWrap: { alignItems: "center", justifyContent: "center", marginBottom: 20 },
-  avatar: { width: 130, height: 130, borderRadius: 65, borderWidth: 2, borderColor: GOLD },
-  glow: { position: "absolute", width: 140, height: 140, borderRadius: 70, opacity: 0.3 },
+  // Outer gradient ring (border)
+  avatarBorder: {
+    width: 146,
+    height: 146,
+    borderRadius: 73,
+    padding: 4, // ring thickness
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: GREEN,
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  // Inner dark container to clip shine and image
+  avatarInner: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+    borderRadius: 69,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Actual avatar image fills the inner circle
+  avatar: { width: "100%", height: "100%", borderRadius: 69 },
+  // Pulsing glow behind everything
+  glow: {
+    position: "absolute",
+    width: 172,
+    height: 172,
+    borderRadius: 86,
+    opacity: 0.35,
+    overflow: "hidden", // ensure the inner gradient clips to a perfect circle
+    pointerEvents: "none",
+  },
+  glowGradient: { borderRadius: 86 },
+  // Glossy highlight overlay
+  shine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.35,
+  },
 
   avatarPicker: { alignItems: "center", marginBottom: 20, width: "100%" },
   primaryBtnWrap: { width: "70%", marginBottom: 12 },
   primaryBtn: { borderRadius: 30, paddingVertical: 12, alignItems: "center" },
   primaryText: { color: "#000", fontSize: 16, fontWeight: "700" },
+  saveOutlineBtn: {
+    borderRadius: 30,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 0,
+    backgroundColor: "transparent",
+  },
+  saveOutlineText: { color: GOLD, fontSize: 16, fontWeight: "700" },
+  saveOutlineBtnGreen: {
+    borderRadius: 30,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 0,
+    borderColor: LOGOUT_GREEN,
+    backgroundColor: "transparent",
+  },
+  saveOutlineTextGreen: { color: LOGOUT_GREEN, fontSize: 16, fontWeight: "700" },
 
-  chooseText: { color: GOLD, fontSize: 16, fontWeight: "700", marginBottom: 10, textAlign: "center" },
-  grid: { flexDirection: "row", gap: 12, justifyContent: "center", width: "100%" },
+  chooseText: { color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 10, textAlign: "center" },
+  cancelOutlineGreen: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+  },
+  cancelOutlineTextGreen: { color: LOGOUT_GREEN, fontWeight: "700", fontSize: 14 },
+  grid: { flexDirection: "row", justifyContent: "center", width: "100%", marginHorizontal: -6 },
   choice: {
     width: 70,
     height: 70,
     borderRadius: 14,
     borderColor: "#333",
-    borderWidth: 1,
-    backgroundColor: "#0f0f0f",
-    overflow: "hidden",
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
+    marginHorizontal: 6,
   },
   choiceSelected: {
     borderColor: GREEN,
@@ -196,14 +582,21 @@ const styles = StyleSheet.create({
   choiceImg: { width: "100%", height: "100%" },
   cancelBtn: { marginTop: 10, paddingVertical: 6, paddingHorizontal: 12 },
   cancelText: { color: "#aaa", textDecorationLine: "underline" },
+  cancelBtnGreen: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    backgroundColor: LOGOUT_GREEN,
+  },
+  cancelTextGreen: { color: "#000", fontWeight: "700", fontSize: 14 },
 
-  name: { fontSize: 22, color: GOLD, fontWeight: "700", marginTop: 10 },
-  email: { fontSize: 14, color: "#aaa", marginBottom: 30 },
+  name: { fontSize: 22, color: GOLD, fontWeight: "700", marginTop: 10, textAlign: "center" },
+  email: { fontSize: 14, color: "#bbb", marginBottom: 30 },
 
   // ✅ Your “bubble” turned into a pill
   logoutBubble: {
-    width: "80%",
-    maxWidth: 320,
+    width: "100%",
     height: 56,
     borderRadius: 28,
     alignItems: "center",
@@ -211,17 +604,36 @@ const styles = StyleSheet.create({
     marginTop: 20,
     overflow: "hidden",
   },
-  logoutBubbleInner: {
+  logoutOutline: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 28,
+    padding: 2, // gradient border thickness
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: LOGOUT_GREEN,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  logoutHollow: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  logoutTextOutline: { color: GOLD, fontSize: 16, fontWeight: "700" },
+  logoutOutlineNeutral: {
     width: "100%",
     height: "100%",
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#7ED957",
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: LOGOUT_GREEN,
   },
-  logoutText: { color: "#000", fontSize: 16, fontWeight: "700" },
+  logoutTextNeutral: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

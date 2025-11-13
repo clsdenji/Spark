@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -42,14 +43,31 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const colorScheme = useColorScheme();  // Custom hook for detecting theme
 
+  // Force a black background for all navigation scenes to avoid white flashes
+  const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      background: '#000',
+      card: '#000',
+      border: '#111',
+      primary: baseTheme.colors.primary,
+      text: baseTheme.colors.text,
+      notification: baseTheme.colors.notification,
+    },
+  } as typeof baseTheme;
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ animation: 'fade' }}>
-        {/* Define stack screens and apply fade transition */}
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="auth" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '' }} />
-      </Stack>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={navTheme}>
+        <Stack screenOptions={{ animation: 'fade' }}>
+          {/* Define stack screens and apply fade transition */}
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '' }} />
+        </Stack>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

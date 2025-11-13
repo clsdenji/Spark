@@ -12,7 +12,8 @@ import {
 import * as Location from "expo-location";
 
 type Props = {
-  onPermissionGranted: (location: Location.LocationObject) => void;
+  // alreadyGranted indicates whether permission was already granted before this component mounted
+  onPermissionGranted: (location: Location.LocationObject, alreadyGranted: boolean) => void;
 };
 
 const GOLD = "#FFDE59";
@@ -24,32 +25,26 @@ const LocationPermission: React.FC<Props> = ({ onPermissionGranted }) => {
   const [visible, setVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Avoid showing the loading message when we're skipping because it's already granted
+  const [skipLoadingMessage, setSkipLoadingMessage] = useState(false);
 
   // adaptive sizing
   const { width, height } = useWindowDimensions();
   const scaleBase = Math.min(width / 390, height / 844);
   const size = (n: number) => Math.round(n * Math.max(0.8, scaleBase));
 
-  // neon breathing
-  const scale = useRef(new Animated.Value(1)).current;
-  const glow = useRef(new Animated.Value(0.85)).current;
-
+  // subtle glow pulse
+  const glow = useRef(new Animated.Value(0.9)).current;
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(scale, { toValue: 1.14, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 1.0,  duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        ]),
-        Animated.sequence([
-          Animated.timing(glow,  { toValue: 1,    duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          Animated.timing(glow,  { toValue: 0.75, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        ]),
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0.75, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [scale, glow]);
+  }, [glow]);
 
   const askLocationPermission = async () => {
     setErrorMsg(null);
@@ -65,7 +60,7 @@ const LocationPermission: React.FC<Props> = ({ onPermissionGranted }) => {
       // ✅ Hide overlay immediately after success
       const location = await Location.getCurrentPositionAsync({});
       setVisible(false);
-      onPermissionGranted(location);
+      onPermissionGranted(location, false);
     } catch {
       setErrorMsg("An error occurred while fetching location.");
     } finally {
@@ -73,54 +68,160 @@ const LocationPermission: React.FC<Props> = ({ onPermissionGranted }) => {
     }
   };
 
+  // On mount, detect if permission already granted; if yes, skip UI and continue immediately
   useEffect(() => {
-    const t = setTimeout(() => {
-      askLocationPermission();
-    }, DELAY_BEFORE_REQUEST_MS);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === "granted") {
+          setSkipLoadingMessage(true);
+          try {
+            await Location.hasServicesEnabledAsync();
+          } catch {}
+
+          const location = await Location.getCurrentPositionAsync({});
+          if (cancelled) return;
+          setVisible(false);
+          onPermissionGranted(location, true);
+          return;
+        }
+      } catch {
+        // fall back to requesting
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+
+      // Not granted yet: request after a small delay to display message
+      timeout = setTimeout(() => {
+        if (!cancelled) askLocationPermission();
+      }, DELAY_BEFORE_REQUEST_MS);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
+    };
   }, []);
 
-  const Spark = () => (
-    <View style={[styles.sparkWrap, { width: size(160), height: size(160), marginBottom: size(18) }]} pointerEvents="none">
-      <Animated.Text
-        style={{
-          position: "absolute",
-          fontSize: size(50),
-          color: GOLD,
-          textShadowColor: AURA_STRONG,
-          textShadowRadius: size(30),
-          textShadowOffset: { width: 0, height: 0 },
-          opacity: glow as any,
-          transform: [{ scale }],
-        }}
-      >
-        ⚡
-      </Animated.Text>
-      <Animated.Text
-        style={{
-          fontSize: size(84),
-          color: GOLD,
-          textShadowColor: AURA,
-          textShadowRadius: size(22),
-          textShadowOffset: { width: 0, height: 0 },
-          transform: [{ scale }],
-        }}
-      >
-        ⚡
-      </Animated.Text>
-    </View>
-  );
+  const Cars = () => {
+    const travel = useRef(new Animated.Value(0)).current;
+    const offset1 = useRef(new Animated.Value(-width * 0.35)).current;
+    const offset2 = useRef(new Animated.Value(-width * 0.05)).current;
+    const offset3 = useRef(new Animated.Value(+width * 0.25)).current;
+
+    useEffect(() => {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(travel, { toValue: 1, duration: 2600, easing: Easing.linear, useNativeDriver: true }),
+          Animated.timing(travel, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }, [travel]);
+
+    const travelX = travel.interpolate({ inputRange: [0, 1], outputRange: [-width * 0.6, width * 0.6] });
+
+    return (
+      <View style={[styles.sparkWrap, { width, height: size(110), marginBottom: size(18) }]} pointerEvents="none">
+        <Animated.Text
+          style={{
+            position: "absolute",
+            fontSize: size(36),
+            textShadowColor: AURA_STRONG,
+            textShadowRadius: size(18),
+            textShadowOffset: { width: 0, height: 0 },
+            opacity: glow as any,
+            transform: [
+              { translateX: Animated.add(travelX, offset1) },
+              { translateY: -size(8) },
+              { scaleX: -1 }, // face right
+            ],
+          }}
+        >
+          🚗
+        </Animated.Text>
+        <Animated.Text
+          style={{
+            position: "absolute",
+            fontSize: size(40),
+            textShadowColor: AURA,
+            textShadowRadius: size(16),
+            textShadowOffset: { width: 0, height: 0 },
+            opacity: glow as any,
+            transform: [
+              { translateX: Animated.add(travelX, offset2) },
+              { scaleX: -1 },
+            ],
+          }}
+        >
+          🚙
+        </Animated.Text>
+        <Animated.Text
+          style={{
+            position: "absolute",
+            fontSize: size(34),
+            textShadowColor: AURA,
+            textShadowRadius: size(14),
+            textShadowOffset: { width: 0, height: 0 },
+            opacity: glow as any,
+            transform: [
+              { translateX: Animated.add(travelX, offset3) },
+              { translateY: size(10) },
+              { scaleX: -1 },
+            ],
+          }}
+        >
+          🚕
+        </Animated.Text>
+
+        {/* Tiny road */}
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            width: width * 0.82,
+            height: size(6),
+            backgroundColor: "#121212",
+            borderRadius: size(4),
+            overflow: "hidden",
+          }}
+        >
+          <View style={{ position: "absolute", inset: 0, opacity: 0.25, backgroundColor: "#ffffff" }} />
+          {/* Center dashed line */}
+          <View
+            style={{
+              position: "absolute",
+              top: size(2),
+              left: width * 0.02,
+              right: width * 0.02,
+              height: size(2),
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            {Array.from({ length: 10 }).map((_, i) => (
+              <View key={i} style={{ width: width * 0.05, height: size(2), backgroundColor: GOLD, opacity: 0.9, borderRadius: 2 }} />
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   if (!visible) return null; // ✅ removes component after success
 
   return (
     <View style={styles.overlay}>
       <View style={styles.centerBox}>
-        <Spark />
-        {loading && (
-          <Text style={[styles.msg, { fontSize: size(16) }]}>
-            Requesting location permission…
-          </Text>
+  <Cars />
+        {loading && !skipLoadingMessage && (
+          <Text style={[styles.msg, { fontSize: size(16), color: GOLD }]}>Requesting location permission…</Text>
         )}
         {errorMsg && (
           <>

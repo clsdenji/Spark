@@ -5,10 +5,10 @@ import React, { useEffect, useRef, useState, type FC } from "react";
 import { View, StyleSheet, Animated, Easing, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { MuseoModerno_700Bold } from "@expo-google-fonts/museomoderno";
 import { supabase } from "./services/supabaseClient";
-import LocationPermission from "./hooks/usePermissionLocation";
 
 // --- Types for Animated values (TS only) ---
 import type { Animated as RNAnimated } from "react-native";
@@ -24,7 +24,6 @@ const DURATION = 2600;
 
 export default function AuthSplashScreen() {
   const router = useRouter();
-  const [showPermission, setShowPermission] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
 
   const inOpacity = useRef(new Animated.Value(0)).current;
@@ -105,7 +104,10 @@ export default function AuthSplashScreen() {
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
-        if (finished) setShowPermission(true);
+        if (finished) {
+          // Go directly to LoginPage when done
+          router.replace("/auth/LoginPage");
+        }
       });
     }, DURATION + 400);
 
@@ -134,13 +136,7 @@ export default function AuthSplashScreen() {
 
         <Animated.View pointerEvents="none" style={[styles.veil, { opacity: veilOpacity }]} />
 
-        {showPermission && (
-          <LocationPermission
-            onPermissionGranted={() => {
-              router.replace("/auth/LoginPage");
-            }}
-          />
-        )}
+        {/* Removed LocationPermission overlay */}
       </LinearGradient>
     </View>
   );
