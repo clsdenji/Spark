@@ -20,11 +20,15 @@ const GREEN = "#7ED957";
 
 export default function Onboarding() {
   const router = useRouter();
-  const { width } = Dimensions.get("window");
-  const PAGES = 3;
+  const { width, height } = Dimensions.get("window");
+  const PAGES = 4;
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<any>(null);
   const [pageIndex, setPageIndex] = useState(0);
+  const [slideWidth, setSlideWidth] = useState(0);
+  const linkOpacity = useRef(new Animated.Value(1)).current;
+  const [linkHeight, setLinkHeight] = useState(0);
+  // Using snapToOffsets + disableIntervalMomentum; no extra gesture bookkeeping needed
 
   // Subtle float + glow
   const floatY = useRef(new Animated.Value(0)).current;
@@ -63,15 +67,23 @@ export default function Onboarding() {
   );
 
   const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+    const w = slideWidth || width;
+    const idx = Math.round(e.nativeEvent.contentOffset.x / w);
     setPageIndex(Math.max(0, Math.min(PAGES - 1, idx)));
   };
 
+  // Make link visibility update instantly (no fade) to avoid click delays
+  useEffect(() => {
+    linkOpacity.setValue(pageIndex === 0 ? 1 : 0);
+  }, [pageIndex, linkOpacity]);
+
   const goNext = () => {
     if (pageIndex >= PAGES - 1) return finish();
-    const nextX = (pageIndex + 1) * width;
-    // Animated.ScrollView has getNode in old Animated wrapper; fallback to cast any
+    const w = slideWidth || width;
+    const target = Math.max(0, Math.min(PAGES - 1, pageIndex + 1));
+    const nextX = target * w;
     (scrollRef.current as any)?.scrollTo?.({ x: nextX, animated: true });
+    setPageIndex(target);
   };
 
   return (
@@ -101,48 +113,122 @@ export default function Onboarding() {
               </TouchableOpacity>
 
               {/* Pager */}
-              <Animated.ScrollView
-                ref={scrollRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                onMomentumScrollEnd={handleMomentumEnd}
-                contentContainerStyle={{ alignItems: "center" }}
+              <View
+                style={styles.pagerWrap}
+                onLayout={(e) => setSlideWidth(e.nativeEvent.layout.width)}
               >
-                {/* Page 1 */}
-                <View style={[styles.slide, { width }]}> 
+                <Animated.ScrollView
+                  ref={scrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={onScroll}
+                  scrollEventThrottle={16}
+                  onMomentumScrollEnd={handleMomentumEnd}
+                  snapToOffsets={Array.from({ length: PAGES }, (_, i) => i * (slideWidth || width))}
+                  disableIntervalMomentum
+                  decelerationRate="fast"
+                  contentContainerStyle={{ alignItems: "center" }}
+                >
+                  {/* Page 1 */}
+                  <View style={[styles.slide, { width: slideWidth || width }]}> 
                   <View style={styles.iconWrap}>
-                    <Ionicons name="map-outline" size={72} color={GREEN} />
+                    <Ionicons name="map-outline" size={height < 700 ? 56 : 64} color={GREEN} />
                   </View>
-                  <Text style={styles.title}>Find Parking Near You</Text>
-                  <Text style={styles.subtitle}>Search parking around your origin or destination with accurate suggestions.</Text>
+                  <Text
+                    style={[styles.title, height < 700 && { fontSize: 24 }]}
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.9}
+                  >
+                    Find Parking in Manila City
+                  </Text>
+                  <Text
+                    style={[styles.subtitle, height < 700 && { fontSize: 13 }]}
+                    numberOfLines={4}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
+                    Search parking around Manila city with top suggestions based on ranking.{"\n"}
+      
+                  </Text>
                 </View>
 
-                {/* Page 2 */}
-                <View style={[styles.slide, { width }]}> 
+                  {/* Page 2 */}
+                  <View style={[styles.slide, { width: slideWidth || width }]}> 
                   <View style={styles.iconWrap}>
-                    <Ionicons name="navigate-outline" size={72} color={GOLD} />
+                    <Ionicons name="navigate-outline" size={height < 700 ? 56 : 64} color={GOLD} />
                   </View>
-                  <Text style={styles.title}>Live Routes & Distance</Text>
-                  <Text style={styles.subtitle}>Preview your route on the map and see distance updates in real-time.</Text>
+                  <Text
+                    style={[styles.title, height < 700 && { fontSize: 24 }]}
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.9}
+                  >
+                    Live Routes & Distance
+                  </Text>
+                  <Text
+                    style={[styles.subtitle, height < 700 && { fontSize: 13 }]}
+                    numberOfLines={3}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
+                  >
+                    Preview your route on the map and see distance updates in real-time.
+                  </Text>
                 </View>
 
-                {/* Page 3 */}
-                <View style={[styles.slide, { width }]}> 
+                  {/* Page 3 */}
+                  <View style={[styles.slide, { width: slideWidth || width }]}> 
                   <View style={styles.iconWrap}>
-                    <Ionicons name="bookmark-outline" size={72} color={GREEN} />
+                    <Ionicons name="bookmark-outline" size={height < 700 ? 56 : 64} color={GREEN} />
                   </View>
-                  <Text style={styles.title}>Save & Revisit</Text>
-                  <Text style={styles.subtitle}>Bookmark favorite spots and review your recent parking history.</Text>
-                </View>
-              </Animated.ScrollView>
+                  <Text
+                    style={[styles.title, height < 700 && { fontSize: 24 }]}
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.9}
+                  >
+                    Save & Revisit
+                  </Text>
+                  <Text
+                    style={[styles.subtitle, height < 700 && { fontSize: 13 }]}
+                    numberOfLines={3}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
+                  >
+                    Bookmark favorite spots and review your recent parking history.
+                  </Text>
+                  </View>
+
+                  {/* Page 4 */}
+                  <View style={[styles.slide, { width: slideWidth || width }]}> 
+                    <View style={styles.iconWrap}>
+                      <Ionicons name="create-outline" size={height < 700 ? 56 : 64} color={GOLD} />
+                    </View>
+                    <Text
+                      style={[styles.title, height < 700 && { fontSize: 24 }]}
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.9}
+                    >
+                      Suggest Edits & Rate
+                    </Text>
+                    <Text
+                      style={[styles.subtitle, height < 700 && { fontSize: 13 }]}
+                      numberOfLines={3}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}
+                    >
+                      Help improve parking info by suggesting edits and rating places after you park.
+                    </Text>
+                  </View>
+                </Animated.ScrollView>
+              </View>
 
               {/* Dots */}
               <View style={styles.dotsRow}>
                 {Array.from({ length: PAGES }).map((_, i) => {
-                  const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+                  const w = slideWidth || width;
+                  const inputRange = [(i - 1) * w, i * w, (i + 1) * w];
                   const dotWidth = scrollX.interpolate({ inputRange, outputRange: [6, 18, 6], extrapolate: 'clamp' });
                   const dotOpacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
                   return (
@@ -158,6 +244,23 @@ export default function Onboarding() {
                     <Text style={styles.mainButtonText}>{pageIndex === PAGES - 1 ? "Get Started" : "Next"}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
+                <Animated.View style={{
+                  alignSelf: 'center',
+                  marginTop: 10,
+                  opacity: linkOpacity,
+                  minHeight: linkHeight || undefined,
+                }}>
+                  <TouchableOpacity
+                    onPress={() => router.push("/auth/OnboardingRanking")}
+                    style={{ alignSelf: 'center' }}
+                    disabled={pageIndex !== 0}
+                    onLayout={(e) => {
+                      if (!linkHeight) setLinkHeight(e.nativeEvent.layout.height);
+                    }}
+                  >
+                    <Text style={{ color: '#aaa', textDecorationLine: 'underline' }}>How we rank suggestions</Text>
+                  </TouchableOpacity>
+                </Animated.View>
               </View>
             </View>
           </LinearGradient>
@@ -199,16 +302,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     alignItems: "center",
   },
-  slide: { alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
-  title: { fontSize: 26, color: GOLD, textAlign: "center", marginBottom: 8, fontWeight: "700" },
-  subtitle: { color: "#ccc", fontSize: 14, textAlign: "center", marginBottom: 18 },
+  pagerWrap: {
+    width: "100%",
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  slide: { alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
+  title: { fontSize: 26, color: GOLD, textAlign: "center", marginBottom: 6, fontWeight: "700" },
+  subtitle: { color: "#ccc", fontSize: 14, textAlign: "center", marginBottom: 14, lineHeight: 20 },
   iconWrap: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
+    marginBottom: 10,
     backgroundColor: "#0d0d0d",
     borderWidth: 2,
     borderColor: GREEN,

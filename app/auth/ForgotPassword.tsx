@@ -23,6 +23,7 @@ import { supabase } from "../services/supabaseClient";
 const GOLD = "#FFDE59";
 const GREEN = "#7ED957";
 const AMBER = "#FFB84D";
+const RED = "#FF4D4D";
 
 // Email helpers (kept from your version)
 const ZW_SPACES = /[\s\u200B\u200C\u200D\uFEFF]/g;
@@ -45,6 +46,20 @@ export default function ForgotPasswordScreen() {
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const scaleAnim = useRef(new Animated.Value(0.98)).current;
   const glowOpacity = useRef(new Animated.Value(0.9)).current;
+  const shakeEmailX = useRef(new Animated.Value(0)).current;
+
+  const triggerShake = (anim: Animated.Value) => {
+    anim.setValue(0);
+    Animated.sequence([
+      Animated.timing(anim, { toValue: -10, duration: 40, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 10, duration: 80, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: -8, duration: 70, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 8, duration: 70, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: -5, duration: 60, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 5, duration: 60, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
 
   const [fontsLoaded] = useFonts({ Poppins_700Bold, Roboto_400Regular });
 
@@ -68,16 +83,37 @@ export default function ForgotPasswordScreen() {
   const onChangeEmail = (v: string) => {
     const cleaned = normalizeEmail(v);
     setEmail(cleaned);
-    setEmailErr(EMAIL_REGEX.test(cleaned) ? "" : "Please enter a valid email address.");
+    if (cleaned.length === 0) {
+      setEmailErr("");
+    } else {
+      setEmailErr(EMAIL_REGEX.test(cleaned) ? "" : "Please enter a valid email address.");
+    }
   };
 
   const handleSendLink = async () => {
     if (!email || emailErr) {
       setEmailErr("Please enter a valid email address.");
+      triggerShake(shakeEmailX);
       return;
     }
     setSending(true);
     try {
+      // Verify the email exists in our users table before sending reset link
+      const { data: rows, error: findErr } = await supabase
+        .from("users")
+        .select("user_id")
+        .eq("email", email)
+        .limit(1);
+
+      if (findErr) {
+        Alert.alert("Error", "Could not verify email. Please try again.");
+        return;
+      }
+      if (!rows || rows.length === 0) {
+        Alert.alert("Not registered", "This email you entered is not registered.");
+        return;
+      }
+
       await supabase.auth.resetPasswordForEmail(email, {
         // Deep link directly into the NewPassword screen
         redirectTo: Linking.createURL("/auth/NewPassword"),
@@ -153,15 +189,17 @@ export default function ForgotPasswordScreen() {
                       Enter your email and we’ll send a reset link.
                     </Text>
 
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Email"
-                      placeholderTextColor="#888"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      value={email}
-                      onChangeText={onChangeEmail}
-                    />
+                    <Animated.View style={{ width: "100%", transform: [{ translateX: shakeEmailX }] }}>
+                      <TextInput
+                        style={[styles.input, !!emailErr && styles.inputError]}
+                        placeholder="Email"
+                        placeholderTextColor="#888"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={email}
+                        onChangeText={onChangeEmail}
+                      />
+                    </Animated.View>
 
                     {!!emailErr && <Text style={styles.errorText}>{emailErr}</Text>}
 
@@ -310,6 +348,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#fff",
     fontFamily: "Roboto_400Regular",
+  },
+
+  inputError: {
+    borderColor: RED,
+    shadowColor: RED,
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
   },
 
   errorText: {

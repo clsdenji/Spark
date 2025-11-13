@@ -1,4 +1,4 @@
-// app/auth/ForgotPasswordScreen.tsx
+// app/auth/NewPassword.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -15,7 +15,6 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { Roboto_400Regular } from "@expo-google-fonts/roboto";
@@ -24,19 +23,19 @@ import { supabase } from "../services/supabaseClient";
 const GOLD = "#FFDE59";
 const GREEN = "#7ED957";
 const AMBER = "#FFB84D";
+const RED = "#FF4D4D";
 
-const ZW_SPACES = /[\s\u200B\u200C\u200D\uFEFF]/g;
-const normalizeEmail = (v: string) => v.normalize("NFKC").replace(ZW_SPACES, "").trim().toLowerCase();
-const EMAIL_REGEX =
-  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+// Password validation: 8+ chars, upper, lower, number, special
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
-export default function ForgotPasswordScreen() {
+export default function NewPasswordScreen() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [emailErr, setEmailErr] = useState("");
-  const [sentTo, setSentTo] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  const [password, setPassword] = useState("");
+  const [rePassword, setRePassword] = useState("");
+  const [passwordErr, setPasswordErr] = useState("");
+  const [rePasswordErr, setRePasswordErr] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   // Animations (match Spark card + glow)
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -63,35 +62,47 @@ export default function ForgotPasswordScreen() {
     return () => loop.stop();
   }, []);
 
-  const onChangeEmail = (v: string) => {
-    const cleaned = normalizeEmail(v);
-    setEmail(cleaned);
-    setEmailErr(EMAIL_REGEX.test(cleaned) ? "" : "Please enter a valid email address.");
+  const onChangePassword = (v: string) => {
+    setPassword(v);
+    if (v.length === 0) setPasswordErr("");
+    else setPasswordErr(PASSWORD_REGEX.test(v) ? "" : "Password must be 8+ chars, include upper, lower, number & special char.");
+    // Keep mismatch in sync if rePassword has value
+    if (rePassword.length > 0) setRePasswordErr(v === rePassword ? "" : "Passwords do not match.");
   };
 
-  const handleSendLink = async () => {
-    if (!email || emailErr) {
-      setEmailErr("Please enter a valid email address.");
+  const onChangeRePassword = (v: string) => {
+    setRePassword(v);
+    if (v.length === 0 || password.length === 0) setRePasswordErr("");
+    else setRePasswordErr(v === password ? "" : "Passwords do not match.");
+  };
+
+  const handleUpdatePassword = async () => {
+    // No prompts here for validation; just inline errors + red outline
+    if (!password || !rePassword) {
+      if (!password) setPasswordErr("Password is required.");
+      if (!rePassword) setRePasswordErr("Please re-enter your password.");
       return;
     }
-    setSending(true);
+    const invalid = !PASSWORD_REGEX.test(password);
+    const mismatch = password !== rePassword;
+    if (invalid) setPasswordErr("Password must be 8+ chars, include upper, lower, number & special char.");
+    if (mismatch) setRePasswordErr("Passwords do not match.");
+    if (invalid || mismatch) return;
+
+    setUpdating(true);
     try {
-      await supabase.auth.resetPasswordForEmail(email, {
-        // Deep link directly into the NewPassword screen
-        redirectTo: Linking.createURL("/auth/NewPassword"),
-      });
-
-      // Censor email locally for UI
-      const [user, domain] = email.split("@");
-      const masked = user && domain
-        ? `${user.slice(0, 2)}****${user.slice(-2)}@${domain}`
-        : email;
-
-      setSentTo(masked);
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
+      Alert.alert("Password updated", "You can now log in with your new password.", [
+        { text: "OK", onPress: () => router.replace("/auth/LoginPage") },
+      ]);
     } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to send reset link.");
+      Alert.alert("Error", e?.message || "Failed to update password.");
     } finally {
-      setSending(false);
+      setUpdating(false);
     }
   };
 
@@ -144,59 +155,42 @@ export default function ForgotPasswordScreen() {
                   <Ionicons name="arrow-back" size={26} color={GOLD} />
                 </TouchableOpacity>
 
-                <Text style={styles.title}>Forgot Password</Text>
+                <Text style={styles.title}>Set New Password</Text>
 
-                {!sentTo ? (
-                  <>
-                    <Text style={styles.subtitle}>
-                      Enter your email and we’ll send a reset link.
+                <Text style={styles.subtitle}>Enter and confirm your new password.</Text>
+
+                <TextInput
+                  style={[styles.input, !!passwordErr && styles.inputError]}
+                  placeholder="New Password"
+                  placeholderTextColor="#888"
+                  secureTextEntry
+                  value={password}
+                  onChangeText={onChangePassword}
+                />
+                {!!passwordErr && <Text style={styles.errorText}>{passwordErr}</Text>}
+
+                <TextInput
+                  style={[styles.input, !!rePasswordErr && styles.inputError]}
+                  placeholder="Re-enter New Password"
+                  placeholderTextColor="#888"
+                  secureTextEntry
+                  value={rePassword}
+                  onChangeText={onChangeRePassword}
+                />
+                {!!rePasswordErr && <Text style={styles.errorText}>{rePasswordErr}</Text>}
+
+                <TouchableOpacity onPress={handleUpdatePassword} activeOpacity={0.9} disabled={updating}>
+                  <LinearGradient
+                    colors={[GOLD, GREEN]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.mainButton, updating && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.mainButtonText}>
+                      {updating ? "Updating..." : "Update Password"}
                     </Text>
-
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Email"
-                      placeholderTextColor="#888"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      value={email}
-                      onChangeText={onChangeEmail}
-                    />
-
-                    {!!emailErr && <Text style={styles.errorText}>{emailErr}</Text>}
-
-                    <TouchableOpacity onPress={handleSendLink} activeOpacity={0.9} disabled={sending}>
-                      <LinearGradient
-                        colors={[GOLD, GREEN]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.mainButton, sending && { opacity: 0.7 }]}
-                      >
-                        <Text style={styles.mainButtonText}>
-                          {sending ? "Sending..." : "Send Reset Link"}
-                        </Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.subtitle}>
-                      A password reset link has been sent to{"\n"}
-                      <Text style={{ color: GOLD }}>{sentTo}</Text>
-                      {"\n"}Please check your inbox (and spam folder).
-                    </Text>
-
-                    <TouchableOpacity onPress={() => router.push("/auth/LoginPage")} activeOpacity={0.9}>
-                      <LinearGradient
-                        colors={[GOLD, GREEN]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.mainButton}
-                      >
-                        <Text style={styles.mainButtonText}>Back to Login</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </>
-                )}
+                  </LinearGradient>
+                </TouchableOpacity>
               </Animated.View>
             </LinearGradient>
           </Animated.View>
@@ -276,6 +270,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
     textAlign: "center",
+  },
+
+  inputError: {
+    borderColor: RED,
+    shadowColor: RED,
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
   },
 
   mainButton: {

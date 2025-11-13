@@ -24,6 +24,7 @@ import { supabase } from "../services/supabaseClient";
 const GOLD = "#FFDE59";
 const GREEN = "#7ED957";
 const AMBER = "#FFB84D";
+const RED = "#FF4D4D";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,6 +49,23 @@ export default function LoginPage() {
   const glowOpacity = useRef(new Animated.Value(0.9)).current;
   const heartbeat = useRef(new Animated.Value(1)).current;
   const errorFade = useRef(new Animated.Value(0)).current;
+  // Shake animations for prominent inline error feedback
+  const shakeEmailX = useRef(new Animated.Value(0)).current;
+  const shakePasswordX = useRef(new Animated.Value(0)).current;
+  const shakeRepasswordX = useRef(new Animated.Value(0)).current;
+
+  const triggerShake = (anim: Animated.Value) => {
+    anim.setValue(0);
+    Animated.sequence([
+      Animated.timing(anim, { toValue: -10, duration: 40, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 10, duration: 80, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: -8, duration: 70, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 8, duration: 70, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: -5, duration: 60, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 5, duration: 60, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
 
   const [fontsLoaded] = useFonts({ Poppins_700Bold, Roboto_400Regular });
 
@@ -105,20 +123,32 @@ export default function LoginPage() {
   const validateEmail = (v: string) => {
     const cleaned = normalizeEmail(v);
     setEmail(cleaned);
-    setEmailError(EMAIL_REGEX.test(cleaned) ? "" : "Please enter a valid email address.");
+    if (cleaned.length === 0) {
+      setEmailError("");
+    } else {
+      setEmailError(EMAIL_REGEX.test(cleaned) ? "" : "Please enter a valid email address.");
+    }
   };
 
   const validatePassword = (v: string) => {
     const regex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    setPasswordError(
-      regex.test(v) ? "" : "Password must be 8+ chars, include upper, lower, number & special char."
-    );
+    if (v.length === 0) {
+      setPasswordError("");
+    } else {
+      setPasswordError(
+        regex.test(v) ? "" : "Password must be 8+ chars, include upper, lower, number & special char."
+      );
+    }
     setPassword(v);
   };
   const validateRePassword = (v: string) => {
     setRePassword(v);
-    setRePasswordError(v === password ? "" : "Passwords do not match.");
+    if (v.length === 0 || password.length === 0) {
+      setRePasswordError("");
+    } else {
+      setRePasswordError(v === password ? "" : "Passwords do not match.");
+    }
   };
 
   const toggleMode = () => {
@@ -137,12 +167,29 @@ export default function LoginPage() {
       Alert.alert("Incomplete", "Please fill all required fields.");
       return;
     }
-    if (emailError || passwordError || rePasswordError) {
-      Alert.alert("Fix errors", "Please fix the errors before proceeding.");
+    // Email must be valid (e.g., name@domain.tld). If not, do nothing (no prompt),
+    // rely on the inline "Please enter a valid email address." error.
+    const sanitizedEmail = normalizeEmail(email);
+    if (!EMAIL_REGEX.test(sanitizedEmail)) {
+      setEmail(sanitizedEmail);
+      if (!emailError) setEmailError("Please enter a valid email address.");
+      // Shake the email input instead of prompting
+      triggerShake(shakeEmailX);
       return;
     }
 
-    const sanitizedEmail = normalizeEmail(email);
+    // Only block quietly (no prompt) for password/rePassword in Sign Up mode.
+ 
+    if (!isLogin) {
+      const mismatch = rePassword !== password;
+      if (mismatch && !rePasswordError) setRePasswordError("Passwords do not match.");
+      if (passwordError || rePasswordError || mismatch) {
+        if (passwordError) triggerShake(shakePasswordX);
+        if (mismatch || rePasswordError) triggerShake(shakeRepasswordX);
+        return;
+      }
+    }
+
     const sanitizedName = name.trim();
 
     if (isLogin) {
@@ -151,7 +198,8 @@ export default function LoginPage() {
         password,
       });
       if (error) {
-        Alert.alert("Login failed", error.message);
+        // Show a friendly message for invalid credentials
+        Alert.alert("Wrong email or password", "Please check your credentials and try again.");
       } else {
         // Show onboarding on every successful login
         router.replace("/auth/Onboarding");
@@ -256,47 +304,78 @@ export default function LoginPage() {
                     />
                   )}
 
-                  <TextInput
-                    style={[styles.input, focusedInput === "email" && styles.inputFocused]}
-                    onFocus={() => setFocusedInput("email")}
-                    onBlur={() => setFocusedInput(null)}
-                    placeholder="Email"
-                    placeholderTextColor="#888"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={email}
-                    onChangeText={validateEmail}
-                  />
+                  <Animated.View style={{ width: "100%", transform: [{ translateX: shakeEmailX }] }}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        focusedInput === "email" && styles.inputFocused,
+                        !!emailError && styles.inputError,
+                      ]}
+                      onFocus={() => setFocusedInput("email")}
+                      onBlur={() => setFocusedInput(null)}
+                      placeholder="Email"
+                      placeholderTextColor="#888"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={email}
+                      onChangeText={validateEmail}
+                    />
+                  </Animated.View>
                   {!!emailError && (
                     <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>{emailError}</Animated.Text>
                   )}
 
-                  <TextInput
-                    style={[styles.input, focusedInput === "password" && styles.inputFocused]}
-                    onFocus={() => setFocusedInput("password")}
-                    onBlur={() => setFocusedInput(null)}
-                    placeholder="Password"
-                    placeholderTextColor="#888"
-                    secureTextEntry
-                    value={password}
-                    onChangeText={validatePassword}
-                  />
+                  <Animated.View style={{ width: "100%", transform: [{ translateX: shakePasswordX }] }}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        focusedInput === "password" && styles.inputFocused,
+                        !isLogin && !!passwordError && styles.inputError,
+                      ]}
+                      onFocus={() => setFocusedInput("password")}
+                      onBlur={() => setFocusedInput(null)}
+                      placeholder="Password"
+                      placeholderTextColor="#888"
+                      secureTextEntry
+                      value={password}
+                      onChangeText={(v) => {
+                        if (isLogin) {
+                          setPassword(v);
+                          // Do not enforce complexity rules in login mode; clear on empty
+                          if (v.length === 0) setPasswordError("");
+                        } else {
+                          validatePassword(v);
+                          // Re-check mismatch inline if user already typed rePassword
+                          if (rePassword.length > 0) {
+                            if (v.length === 0) setRePasswordError("");
+                            else setRePasswordError(v === rePassword ? "" : "Passwords do not match.");
+                          }
+                        }
+                      }}
+                    />
+                  </Animated.View>
                   {!!passwordError && (
                     <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>{passwordError}</Animated.Text>
                   )}
 
                   {!isLogin && (
                     <>
-                      <TextInput
-                        style={[styles.input, focusedInput === "repassword" && styles.inputFocused]}
-                        onFocus={() => setFocusedInput("repassword")}
-                        onBlur={() => setFocusedInput(null)}
-                        placeholder="Re-enter Password"
-                        placeholderTextColor="#888"
-                        secureTextEntry
-                        value={rePassword}
-                        onChangeText={validateRePassword}
-                      />
+                      <Animated.View style={{ width: "100%", transform: [{ translateX: shakeRepasswordX }] }}>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            focusedInput === "repassword" && styles.inputFocused,
+                            !!rePasswordError && styles.inputError,
+                          ]}
+                          onFocus={() => setFocusedInput("repassword")}
+                          onBlur={() => setFocusedInput(null)}
+                          placeholder="Re-enter Password"
+                          placeholderTextColor="#888"
+                          secureTextEntry
+                          value={rePassword}
+                          onChangeText={validateRePassword}
+                        />
+                      </Animated.View>
                       {!!rePasswordError && (
                         <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>{rePasswordError}</Animated.Text>
                       )}
@@ -420,6 +499,12 @@ const styles = StyleSheet.create({
     borderColor: GREEN,
     shadowColor: GREEN,
     shadowOpacity: 0.6,
+    shadowRadius: 10,
+  },
+  inputError: {
+    borderColor: RED,
+    shadowColor: RED,
+    shadowOpacity: 0.7,
     shadowRadius: 10,
   },
   mainButton: {

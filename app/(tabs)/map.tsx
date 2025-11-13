@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { getDistance } from 'geolib';
 import { Feather, Entypo } from '@expo/vector-icons';
 import { addSearch } from '../services/searchHistory';
+import { useLocalSearchParams } from 'expo-router';
 
 const GOLD = '#FFDE59';
 const GRAY = '#9CA3AF';
@@ -15,6 +16,7 @@ type Place = { name: string; lat: number; lon: number; distanceKm?: number };
 const MANILA = { latitude: 14.5995, longitude: 120.9842 };
 
 const MapScreen: React.FC = () => {
+  const params = useLocalSearchParams<{ destLat?: string; destLng?: string; destName?: string; from?: string; ts?: string }>();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [originPhrase, setOriginPhrase] = useState('');
   const [destinationPhrase, setDestinationPhrase] = useState('');
@@ -31,6 +33,7 @@ const MapScreen: React.FC = () => {
   const abortRef = useRef<AbortController | null>(null);
   const routeAbortRef = useRef<AbortController | null>(null);
   const ZOOM_OUT_FACTOR = 1.4; // slightly zoomed out so the path is clearly seen
+  const handledParamRef = useRef<string | null>(null);
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
@@ -104,6 +107,25 @@ const MapScreen: React.FC = () => {
     }
   };
 
+  // Fetch a single best match for a free-text query
+  const fetchFirstPlace = async (query: string): Promise<Place | null> => {
+    const q = query.trim();
+    if (q.length < 2) return null;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(q + ' Manila')}`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'YourApp/1.0 (expo)' } });
+      const data = (await res.json()) as Array<any>;
+      const d = data?.[0];
+      if (!d) return null;
+      const lat = parseFloat(d.lat);
+      const lon = parseFloat(d.lon);
+      const name = d.display_name || `${d.name || q}`;
+      return { name, lat, lon };
+    } catch {
+      return null;
+    }
+  };
+
     const shortAddress = (full: string, parts: number = 3, maxLen: number = 48): string => {
       try {
         const segs = full.split(',').map((s) => s.trim()).filter(Boolean);
@@ -130,6 +152,49 @@ const MapScreen: React.FC = () => {
   const triggerSearch = (text: string) => {
     if (debounceRef.current) { clearTimeout(debounceRef.current as number); }
     debounceRef.current = setTimeout(() => doSearch(text), 250) as unknown as number;
+  };
+
+  // Force re-compute and re-fit even if addresses are unchanged
+  const refreshRoute = () => {
+    try {
+      const from = currentOriginCoord ?? (location ? { latitude: location.latitude, longitude: location.longitude } : null);
+      const to = currentDestinationCoord;
+      if (!to) return; // need a destination to show
+      setTimeout(() => {
+        fitCameraIfPossible(from, to);
+        fetchRoute(from, to);
+      }, 30);
+    } catch {}
+  };
+
+  const setDestinationFromQuery = async (query: string) => {
+    const best = await fetchFirstPlace(query);
+    if (!best) return false;
+    setActiveField('to');
+    setDestinationPlace(best);
+    try { setDestinationPhrase(shortAddress(best.name)); } catch {}
+    const to = { latitude: best.lat, longitude: best.lon };
+    const from = currentOriginCoord ?? (location ? { latitude: location.latitude, longitude: location.longitude } : null);
+    setTimeout(() => {
+      fitCameraIfPossible(from, to);
+      fetchRoute(from, to);
+    }, 50);
+    return true;
+  };
+
+  const setOriginFromQuery = async (query: string) => {
+    const best = await fetchFirstPlace(query);
+    if (!best) return false;
+    setActiveField('from');
+    setOriginPlace(best);
+    try { setOriginPhrase(shortAddress(best.name)); } catch {}
+    const from = { latitude: best.lat, longitude: best.lon };
+    const to = currentDestinationCoord;
+    setTimeout(() => {
+      fitCameraIfPossible(from, to);
+      fetchRoute(from, to);
+    }, 50);
+    return true;
   };
 
   const animateToBounds = (points: Array<{ latitude: number; longitude: number }>) => {
@@ -182,7 +247,7 @@ const MapScreen: React.FC = () => {
     }
   };
 
-  const useCurrentAsOrigin = async () => {
+  const useCurrentAsOrigin = async (toCoord?: { latitude: number; longitude: number } | null) => {
     try {
       let base = location;
       if (!base) {
@@ -201,7 +266,7 @@ const MapScreen: React.FC = () => {
       setSearchResults([]);
       Keyboard.dismiss();
       const from = base ? { latitude: base.latitude, longitude: base.longitude } : null;
-      const to = currentDestinationCoord;
+      const to = toCoord ?? currentDestinationCoord;
       setTimeout(() => {
         fitCameraIfPossible(from, to);
         fetchRoute(from, to);
@@ -215,6 +280,7 @@ const MapScreen: React.FC = () => {
       setOriginPlace(null);
       setRouteCoords([]);
       setSearchResults([]);
+      handledParamRef.current = null; // allow re-handling same params after clearing
       // center on destination if present
       const to = currentDestinationCoord;
       setTimeout(() => {
@@ -229,6 +295,7 @@ const MapScreen: React.FC = () => {
       setDestinationPlace(null);
       setRouteCoords([]);
       setSearchResults([]);
+      handledParamRef.current = null; // allow re-handling same params after clearing
       // center on origin if present
       const from = currentOriginCoord;
       setTimeout(() => {
@@ -260,6 +327,46 @@ const MapScreen: React.FC = () => {
       fetchRoute(from ?? null, to ?? null);
     }, 50);
   };
+
+  // Handle navigation params from History: set destination and optionally route from current location
+  useEffect(() => {
+    const latStr = params?.destLat as string | undefined;
+    const lngStr = params?.destLng as string | undefined;
+    const nameStr = params?.destName as string | undefined;
+    const fromFlag = params?.from as string | undefined;
+    const ts = params?.ts as string | undefined;
+    if (!latStr || !lngStr) return;
+    const key = `${latStr}|${lngStr}|${nameStr ?? ''}|${fromFlag ?? ''}|${ts ?? ''}`;
+    if (handledParamRef.current === key) return;
+    handledParamRef.current = key;
+    const lat = parseFloat(latStr);
+    const lon = parseFloat(lngStr);
+    if (!isFinite(lat) || !isFinite(lon)) return;
+    const name = nameStr && nameStr.trim().length > 0 ? nameStr : `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+    // Set destination
+    const dest: Place = { name, lat, lon };
+    setActiveField('to');
+    setDestinationPlace(dest);
+    try { setDestinationPhrase(name); } catch {}
+
+    // If requested, set origin to current location and compute route
+    if (fromFlag === 'me') {
+      (async () => {
+        try {
+          // Ensure current location is set as origin and route to provided destination
+          await useCurrentAsOrigin({ latitude: lat, longitude: lon });
+        } catch {}
+      })();
+    } else {
+      // Otherwise, just focus destination and compute route if origin exists
+      const to = { latitude: lat, longitude: lon };
+      setTimeout(() => {
+        fitCameraIfPossible(currentOriginCoord, to);
+        fetchRoute(currentOriginCoord, to);
+      }, 80);
+    }
+  }, [params?.destLat, params?.destLng, params?.destName, params?.from, params?.ts]);
 
   const swapFromTo = () => {
     setOriginPlace(destinationPlace);
@@ -311,7 +418,14 @@ const MapScreen: React.FC = () => {
                   }
                 }}
                 returnKeyType="search"
-                onSubmitEditing={() => doSearch(originPhrase)}
+                onSubmitEditing={async () => {
+                  // Try to resolve origin to a coordinate and update route even if text is unchanged
+                  const ok = await setOriginFromQuery(originPhrase);
+                  if (!ok) {
+                    doSearch(originPhrase);
+                    refreshRoute();
+                  }
+                }}
               />
               {!!originPhrase && (
                 <TouchableOpacity onPress={() => { clearOrigin(); originInputRef.current?.focus?.(); }} style={styles.clearTouch}>
@@ -319,7 +433,7 @@ const MapScreen: React.FC = () => {
                 </TouchableOpacity>
               )}
               {location && (
-                <TouchableOpacity onPress={useCurrentAsOrigin} style={styles.clearTouch} accessibilityLabel="Use current location">
+                <TouchableOpacity onPress={() => useCurrentAsOrigin()} style={styles.clearTouch} accessibilityLabel="Use current location">
                   <Feather name="crosshair" size={18} color="#FFD166" />
                 </TouchableOpacity>
               )}
@@ -344,7 +458,14 @@ const MapScreen: React.FC = () => {
                   }
                 }}
                 returnKeyType="search"
-                onSubmitEditing={() => doSearch(destinationPhrase)}
+                onSubmitEditing={async () => {
+                  // Try to resolve destination to a coordinate and update route even if text is unchanged
+                  const ok = await setDestinationFromQuery(destinationPhrase);
+                  if (!ok) {
+                    doSearch(destinationPhrase);
+                    refreshRoute();
+                  }
+                }}
               />
               {!!destinationPhrase && (
                 <TouchableOpacity onPress={() => { clearDestination(); destinationInputRef.current?.focus?.(); }} style={styles.clearTouch}>

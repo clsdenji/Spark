@@ -11,11 +11,11 @@ import {
   StatusBar,
   Alert,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import SmoothScreen from "./components/SmoothScreen";
+import { useRouter } from "expo-router";
 import { getSearchHistory, subscribeSearchHistory, clearSearchHistory, SearchEntry } from "../services/searchHistory";
 
-const RECENT_SEARCHES_KEY = "recent_searches_v1";
+// History is now stored per-user in Supabase via services/searchHistory
 
 // Responsive helpers
 const { width, height } = Dimensions.get("window");
@@ -25,6 +25,7 @@ const HP = (pct: number) => Math.round((height * pct) / 100);
 type RecentItem = { id: string; name: string; address?: string; lat?: number; lng?: number; timestamp: number };
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const [items, setItems] = useState<SearchEntry[]>(() => getSearchHistory());
 
   useEffect(() => {
@@ -40,14 +41,9 @@ export default function HistoryScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+            await clearSearchHistory();
           } catch (e) {
-            console.warn("Failed to remove AsyncStorage key", e);
-          }
-          try {
-            clearSearchHistory();
-          } catch (e) {
-            console.warn("Failed to clear in-memory history", e);
+            console.warn("Failed to clear history", e);
           }
           setItems([]);
         },
@@ -58,7 +54,28 @@ export default function HistoryScreen() {
   const renderItem = ({ item }: { item: SearchEntry }) => {
     const time = new Date(item.timestamp).toLocaleString();
     return (
-      <TouchableOpacity style={styles.squareItem} activeOpacity={0.9}>
+      <TouchableOpacity
+        style={styles.squareItem}
+        activeOpacity={0.9}
+        onPress={() => {
+          try {
+            if (item.lat != null && item.lng != null) {
+              router.push({
+                pathname: "/(tabs)/map",
+                params: {
+                  destLat: String(item.lat),
+                  destLng: String(item.lng),
+                  destName: item.address ?? item.name,
+                  from: "me",
+                  ts: String(Date.now()),
+                },
+              });
+            } else {
+              router.push("/(tabs)/map");
+            }
+          } catch {}
+        }}
+      >
         <View style={styles.squareContent}>
           <Text
             style={styles.squareName}
