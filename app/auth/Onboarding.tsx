@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "../services/supabaseClient";
 import { Ionicons } from "@expo/vector-icons";
 
 const GOLD = "#FFDE59";
@@ -56,7 +57,15 @@ export default function Onboarding() {
 
   const finish = async () => {
     try {
-      await AsyncStorage.setItem("onboarding_seen_v2", "1");
+      // mark onboarding seen per-user to avoid showing for other accounts
+      const { data: userRes } = await supabase.auth.getUser();
+      const userId = userRes?.user?.id;
+      if (userId) {
+        await AsyncStorage.setItem(`onboarding_seen_v2:${userId}`, "1");
+      } else {
+        // fallback global key for legacy behavior
+        await AsyncStorage.setItem("onboarding_seen_v2", "1");
+      }
     } catch {}
     router.replace("/(tabs)/map");
   };
@@ -195,14 +204,14 @@ export default function Onboarding() {
                     adjustsFontSizeToFit
                     minimumFontScale={0.85}
                   >
-                    Bookmark favorite spots and review your recent parking history.
+                    Bookmark favorite spots and review your recent search history.
                   </Text>
                   </View>
 
                   {/* Page 4 */}
                   <View style={[styles.slide, { width: slideWidth || width }]}> 
                     <View style={styles.iconWrap}>
-                      <Ionicons name="create-outline" size={height < 700 ? 56 : 64} color={GOLD} />
+                      <Ionicons name="pencil-outline" size={height < 700 ? 56 : 64} color={GOLD} />
                     </View>
                     <Text
                       style={[styles.title, height < 700 && { fontSize: 24 }]}
@@ -210,7 +219,7 @@ export default function Onboarding() {
                       adjustsFontSizeToFit
                       minimumFontScale={0.9}
                     >
-                      Suggest Edits & Rate
+                      Request an Edit
                     </Text>
                     <Text
                       style={[styles.subtitle, height < 700 && { fontSize: 13 }]}
@@ -218,7 +227,7 @@ export default function Onboarding() {
                       adjustsFontSizeToFit
                       minimumFontScale={0.85}
                     >
-                      Help improve parking info by suggesting edits and rating places after you park.
+                      Submit an edit request form and our team will review and consider it for future updates.
                     </Text>
                   </View>
                 </Animated.ScrollView>
@@ -261,6 +270,10 @@ export default function Onboarding() {
                     <Text style={{ color: '#aaa', textDecorationLine: 'underline' }}>How we rank suggestions</Text>
                   </TouchableOpacity>
                 </Animated.View>
+                {/* Disclaimer */}
+                <Text style={styles.disclaimer}>
+                  Data shown in this app is experimental and manually collected. Some information may be inaccurate or incomplete.
+                </Text>
               </View>
             </View>
           </LinearGradient>
@@ -327,4 +340,11 @@ const styles = StyleSheet.create({
   mainButtonText: { color: "#0b0b0b", fontWeight: "700", fontSize: 18 },
   topSkip: { position: "absolute", top: 12, right: 12, paddingVertical: 8, paddingHorizontal: 12, zIndex: 5 },
   skipText: { color: "#aaa", textDecorationLine: "underline" },
+  disclaimer: {
+    color: "#888",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 12,
+    lineHeight: 16,
+  },
 });

@@ -11,7 +11,7 @@ const RED = '#FF4D4D';
 export default function OnboardingRanking() {
   const router = useRouter();
   const { width, height } = Dimensions.get('window');
-  const PAGES = 3;
+  const PAGES = 4;
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<any>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -81,19 +81,6 @@ export default function OnboardingRanking() {
                   decelerationRate="fast"
                   contentContainerStyle={{ alignItems: 'center' }}
                 >
-                {/* Security */}
-                <View style={[styles.slide, { width: slideWidth || width }]}> 
-                  <View style={styles.iconWrap}>
-                    <Ionicons name="shield-checkmark" size={height < 700 ? 56 : 64} color={GREEN} />
-                  </View>
-                  <Text style={[styles.title, height < 700 && { fontSize: 24 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
-                    Security First
-                  </Text>
-                  <Text style={[styles.subtitle, height < 700 && { fontSize: 13 }]} numberOfLines={4} adjustsFontSizeToFit minimumFontScale={0.8}>
-                    We prioritize safer locations using available safety indicators and community feedback.
-                  </Text>
-                </View>
-
                 {/* Distance */}
                 <View style={[styles.slide, { width: slideWidth || width }]}> 
                   <View style={styles.iconWrap}>
@@ -107,16 +94,44 @@ export default function OnboardingRanking() {
                   </Text>
                 </View>
 
-                {/* Ratings */}
+                {/* Security */}
                 <View style={[styles.slide, { width: slideWidth || width }]}> 
                   <View style={styles.iconWrap}>
-                    <Ionicons name="star" size={height < 700 ? 56 : 64} color={GOLD} />
+                    <Ionicons name="shield-checkmark" size={height < 700 ? 56 : 64} color={GREEN} />
                   </View>
                   <Text style={[styles.title, height < 700 && { fontSize: 24 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
-                    Real User Ratings
+                    Security First
                   </Text>
                   <Text style={[styles.subtitle, height < 700 && { fontSize: 13 }]} numberOfLines={4} adjustsFontSizeToFit minimumFontScale={0.8}>
-                    We factor in ratings from users who recently parked to surface trustworthy options.
+                    We prioritize safer locations using available safety indicators (CCTV and security guards).
+                  </Text>
+                </View>
+
+                
+
+                {/* Hours */}
+                <View style={[styles.slide, { width: slideWidth || width }]}> 
+                  <View style={styles.iconWrap}>
+                    <Ionicons name="time-outline" size={height < 700 ? 56 : 64} color={GOLD} />
+                  </View>
+                  <Text style={[styles.title, height < 700 && { fontSize: 24 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
+                    Opening & Closing Hours
+                  </Text>
+                  <Text style={[styles.subtitle, height < 700 && { fontSize: 13 }]} numberOfLines={4} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    See hours at a glance to know if a parking area is open.
+                  </Text>
+                </View>
+
+                {/* Estimated Costs */}
+                <View style={[styles.slide, { width: slideWidth || width }]}> 
+                  <View style={styles.iconWrap}>
+                    <Ionicons name="cash-outline" size={height < 700 ? 56 : 64} color={GREEN} />
+                  </View>
+                  <Text style={[styles.title, height < 700 && { fontSize: 24 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.9}>
+                    Estimated Costs
+                  </Text>
+                  <Text style={[styles.subtitle, height < 700 && { fontSize: 13 }]} numberOfLines={4} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    Check ballpark rates before you go.
                   </Text>
                 </View>
                 </Animated.ScrollView>

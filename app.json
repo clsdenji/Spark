@@ -60,7 +60,8 @@
       "eas": {
         "projectId": "fakqwgyvbqhonwfufhxg"
       },
-      "googleMapsApiKey": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0"
+      "googleMapsApiKey": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0",
+      "EXPO_PUBLIC_API_URL": "http://192.168.100.10:8000"
     }
   }
 }

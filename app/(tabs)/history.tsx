@@ -53,6 +53,7 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: SearchEntry }) => {
     const time = new Date(item.timestamp).toLocaleString();
+    const sub = item.address ?? (item.lat != null && item.lng != null ? `${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}` : "");
     return (
       <TouchableOpacity
         style={styles.squareItem}
@@ -93,7 +94,7 @@ export default function HistoryScreen() {
             minimumFontScale={0.6}
             allowFontScaling
           >
-            {item.address ? item.address : item.lat && item.lng ? `${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}` : ""}
+            {sub}
           </Text>
         </View>
         <Text style={styles.squareTime} numberOfLines={1} allowFontScaling>
@@ -211,7 +212,7 @@ const styles = StyleSheet.create({
   },
   squareSub: {
     color: "#aaa",
-    fontSize: Math.max(11, WP(3.6)),
+    fontSize: Math.max(12, WP(4.0)),
     flexShrink: 1,
   },
   squareTime: {

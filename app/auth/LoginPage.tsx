@@ -201,8 +201,23 @@ export default function LoginPage() {
         // Show a friendly message for invalid credentials
         Alert.alert("Wrong email or password", "Please check your credentials and try again.");
       } else {
-        // Show onboarding on every successful login
-        router.replace("/auth/Onboarding");
+        // After successful login, show onboarding only if this user hasn't seen it yet
+        try {
+          const { data: userRes } = await supabase.auth.getUser();
+          const userId = userRes?.user?.id;
+          let shouldShowOnboarding = true;
+          if (userId) {
+            const seen = await AsyncStorage.getItem(`onboarding_seen_v2:${userId}`);
+            shouldShowOnboarding = !seen;
+          } else {
+            const legacy = await AsyncStorage.getItem("onboarding_seen_v2");
+            shouldShowOnboarding = !legacy;
+          }
+          router.replace(shouldShowOnboarding ? "/auth/Onboarding" : "/(tabs)/map");
+        } catch {
+          // If any error occurs, continue to main app
+          router.replace("/(tabs)/map");
+        }
       }
     } else {
       const { data, error } = await supabase.auth.signUp({
