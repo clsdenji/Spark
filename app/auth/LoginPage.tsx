@@ -21,10 +21,11 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../services/supabaseClient";
 
-const GOLD = "#FFDE59";
-const GREEN = "#7ED957";
-const AMBER = "#FFB84D";
-const RED = "#FF4D4D";
+// Black & Yellow palette
+const GOLD = "#FFDE59"; // main yellow
+const YELLOW_GLOW = "rgba(255, 209, 102, 0.45)";
+const AMBER = "#FFB84D"; // keep for warnings
+const RED = "#FF4D4D";   // error
 
 export default function LoginPage() {
   const router = useRouter();
@@ -45,11 +46,10 @@ export default function LoginPage() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const scaleAnim = useRef(new Animated.Value(0.98)).current;
-  // Native-driver friendly glow opacity used by a gradient overlay
   const glowOpacity = useRef(new Animated.Value(0.9)).current;
   const heartbeat = useRef(new Animated.Value(1)).current;
   const errorFade = useRef(new Animated.Value(0)).current;
-  // Shake animations for prominent inline error feedback
+
   const shakeEmailX = useRef(new Animated.Value(0)).current;
   const shakePasswordX = useRef(new Animated.Value(0)).current;
   const shakeRepasswordX = useRef(new Animated.Value(0)).current;
@@ -69,7 +69,7 @@ export default function LoginPage() {
 
   const [fontsLoaded] = useFonts({ Poppins_700Bold, Roboto_400Regular });
 
-  // Heartbeat animation
+  // Heartbeat animation (for loading bolt)
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -81,7 +81,7 @@ export default function LoginPage() {
     return () => loop.stop();
   }, [heartbeat]);
 
-  // Glow animation (use opacity on a gradient layer so it can use native driver on both platforms)
+  // Glow animation
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -113,7 +113,7 @@ export default function LoginPage() {
   }, [emailError, passwordError, rePasswordError, errorFade]);
 
   // Validation
-  const ZW_SPACES = /[\s\u200B\u200C\u200D\uFEFF]/g; // invisible chars
+  const ZW_SPACES = /[\s\u200B\u200C\u200D\uFEFF]/g;
   function normalizeEmail(value: string) {
     return value.normalize("NFKC").replace(ZW_SPACES, "").trim().toLowerCase();
   }
@@ -142,6 +142,7 @@ export default function LoginPage() {
     }
     setPassword(v);
   };
+
   const validateRePassword = (v: string) => {
     setRePassword(v);
     if (v.length === 0 || password.length === 0) {
@@ -167,19 +168,15 @@ export default function LoginPage() {
       Alert.alert("Incomplete", "Please fill all required fields.");
       return;
     }
-    // Email must be valid (e.g., name@domain.tld). If not, do nothing (no prompt),
-    // rely on the inline "Please enter a valid email address." error.
+
     const sanitizedEmail = normalizeEmail(email);
     if (!EMAIL_REGEX.test(sanitizedEmail)) {
       setEmail(sanitizedEmail);
       if (!emailError) setEmailError("Please enter a valid email address.");
-      // Shake the email input instead of prompting
       triggerShake(shakeEmailX);
       return;
     }
 
-    // Only block quietly (no prompt) for password/rePassword in Sign Up mode.
- 
     if (!isLogin) {
       const mismatch = rePassword !== password;
       if (mismatch && !rePasswordError) setRePasswordError("Passwords do not match.");
@@ -198,10 +195,8 @@ export default function LoginPage() {
         password,
       });
       if (error) {
-        // Show a friendly message for invalid credentials
         Alert.alert("Wrong email or password", "Please check your credentials and try again.");
       } else {
-        // After successful login, show onboarding only if this user hasn't seen it yet
         try {
           const { data: userRes } = await supabase.auth.getUser();
           const userId = userRes?.user?.id;
@@ -215,7 +210,6 @@ export default function LoginPage() {
           }
           router.replace(shouldShowOnboarding ? "/auth/Onboarding" : "/(tabs)/map");
         } catch {
-          // If any error occurs, continue to main app
           router.replace("/(tabs)/map");
         }
       }
@@ -242,7 +236,7 @@ export default function LoginPage() {
     }
   };
 
-  // Loading gate — fonts only (location permission was handled earlier)
+  // Loading gate — fonts only
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
@@ -275,22 +269,29 @@ export default function LoginPage() {
                 styles.glowWrap,
                 {
                   transform: [
-                    { scale: glowOpacity.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
+                    {
+                      scale: glowOpacity.interpolate({
+                        inputRange: [0.9, 1],
+                        outputRange: [1, 1.015],
+                      }),
+                    },
                   ],
                 },
               ]}
             >
-              {/* Simulated glow layer */}
+              {/* Glow layer */}
               <Animated.View style={[styles.glowLayer, { opacity: glowOpacity }]} pointerEvents="none">
                 <LinearGradient
-                  colors={[GREEN + "33", GOLD + "22", "transparent"]}
+                  colors={[GOLD + "33", GOLD + "18", "transparent"]}
                   start={{ x: 0.3, y: 0 }}
                   end={{ x: 0.7, y: 1 }}
                   style={styles.glowGradient}
                 />
               </Animated.View>
+
+              {/* Card border gradient (yellow only) */}
               <LinearGradient
-                colors={[GOLD, GREEN]}
+                colors={[GOLD, GOLD]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.cardWrapper}
@@ -298,7 +299,10 @@ export default function LoginPage() {
                 <Animated.View
                   style={[
                     styles.card,
-                    { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] },
+                    {
+                      opacity: fadeAnim,
+                      transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+                    },
                   ]}
                 >
                   <View style={{ alignItems: "center", marginBottom: 26 }}>
@@ -337,7 +341,9 @@ export default function LoginPage() {
                     />
                   </Animated.View>
                   {!!emailError && (
-                    <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>{emailError}</Animated.Text>
+                    <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>
+                      {emailError}
+                    </Animated.Text>
                   )}
 
                   <Animated.View style={{ width: "100%", transform: [{ translateX: shakePasswordX }] }}>
@@ -356,26 +362,30 @@ export default function LoginPage() {
                       onChangeText={(v) => {
                         if (isLogin) {
                           setPassword(v);
-                          // Do not enforce complexity rules in login mode; clear on empty
                           if (v.length === 0) setPasswordError("");
                         } else {
                           validatePassword(v);
-                          // Re-check mismatch inline if user already typed rePassword
                           if (rePassword.length > 0) {
                             if (v.length === 0) setRePasswordError("");
-                            else setRePasswordError(v === rePassword ? "" : "Passwords do not match.");
+                            else setRePasswordError(
+                              v === rePassword ? "" : "Passwords do not match."
+                            );
                           }
                         }
                       }}
                     />
                   </Animated.View>
                   {!!passwordError && (
-                    <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>{passwordError}</Animated.Text>
+                    <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>
+                      {passwordError}
+                    </Animated.Text>
                   )}
 
                   {!isLogin && (
                     <>
-                      <Animated.View style={{ width: "100%", transform: [{ translateX: shakeRepasswordX }] }}>
+                      <Animated.View
+                        style={{ width: "100%", transform: [{ translateX: shakeRepasswordX }] }}
+                      >
                         <TextInput
                           style={[
                             styles.input,
@@ -392,23 +402,26 @@ export default function LoginPage() {
                         />
                       </Animated.View>
                       {!!rePasswordError && (
-                        <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>{rePasswordError}</Animated.Text>
+                        <Animated.Text style={[styles.errorText, { opacity: errorFade }]}>
+                          {rePasswordError}
+                        </Animated.Text>
                       )}
                     </>
                   )}
 
                   <TouchableOpacity onPress={handleSubmit} activeOpacity={0.9} style={{ width: "100%" }}>
                     <LinearGradient
-                      colors={[GOLD, GREEN]}
+                      colors={[GOLD, GOLD]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.mainButton}
                     >
-                      <Text style={styles.mainButtonText}>{isLogin ? "Log in" : "Sign Up"}</Text>
+                      <Text style={styles.mainButtonText}>
+                        {isLogin ? "Log in" : "Sign Up"}
+                      </Text>
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  {/* Single-line adaptive footer */}
                   <TouchableOpacity onPress={toggleMode} style={styles.outlineButton}>
                     <Text
                       style={styles.outlineButtonText}
@@ -422,9 +435,7 @@ export default function LoginPage() {
                   </TouchableOpacity>
 
                   {isLogin && (
-                    <TouchableOpacity
-                      onPress={() => router.push("/auth/ForgotPassword")}
-                    >
+                    <TouchableOpacity onPress={() => router.push("/auth/ForgotPassword")}>
                       <Text style={styles.forgotText}>Forgot Password?</Text>
                     </TouchableOpacity>
                   )}
@@ -454,7 +465,7 @@ const styles = StyleSheet.create({
     width: "92%",
     alignSelf: "center",
     borderRadius: 50,
-    shadowColor: GREEN,
+    shadowColor: GOLD,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
   },
@@ -486,15 +497,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: GOLD,
     fontFamily: "Poppins_700Bold",
-    textShadowColor: "rgba(255, 222, 89, 0.45)",
+    textShadowColor: YELLOW_GLOW,
     textShadowRadius: 10,
     marginBottom: -4,
   },
   sparkTitle: {
     fontSize: 38,
-    color: GREEN,
+    color: GOLD,
     fontFamily: "Poppins_700Bold",
-    textShadowColor: "rgba(126, 217, 87, 0.45)",
+    textShadowColor: YELLOW_GLOW,
     textShadowRadius: 14,
   },
   input: {
@@ -511,8 +522,8 @@ const styles = StyleSheet.create({
     fontFamily: "Roboto_400Regular",
   },
   inputFocused: {
-    borderColor: GREEN,
-    shadowColor: GREEN,
+    borderColor: GOLD,
+    shadowColor: GOLD,
     shadowOpacity: 0.6,
     shadowRadius: 10,
   },
@@ -543,21 +554,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 28,
     borderWidth: 2,
-    borderColor: GREEN,
+    borderColor: GOLD,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
   },
   outlineButtonText: {
-    color: GREEN,
+    color: GOLD,
     fontWeight: "700",
     fontSize: 16,
     textAlign: "center",
   },
-  linkText: { color: GREEN, textDecorationLine: "underline" },
-  forgotText: { color: GOLD, marginTop: 10, fontSize: 15, textDecorationLine: "underline" },
+  linkText: { color: GOLD, textDecorationLine: "underline" },
+  forgotText: {
+    color: GOLD,
+    marginTop: 10,
+    fontSize: 15,
+    textDecorationLine: "underline",
+  },
   errorText: { color: AMBER, fontSize: 13, marginBottom: 8 },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
-  loadingText: { marginTop: 15, color: GOLD, fontSize: 16 },
-  loadingBolt: { fontSize: 60, color: GOLD, textShadowColor: "rgba(255, 222, 89, 0.6)", textShadowRadius: 25 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  loadingBolt: {
+    fontSize: 60,
+    color: GOLD,
+    textShadowColor: "rgba(255, 222, 89, 0.6)",
+    textShadowRadius: 25,
+  },
 });

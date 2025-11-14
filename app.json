@@ -19,6 +19,9 @@
         "NSLocationWhenInUseUsageDescription": "Spark needs your location to show nearby parking areas.",
         "UIBackgroundModes": ["location"],
         "NSLocationAlwaysUsageDescription": "Spark needs your location to provide accurate parking spot information."
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0"
       }
     },
     "android": {
@@ -62,6 +65,8 @@
       },
       "googleMapsApiKey": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0",
       "EXPO_PUBLIC_API_URL": "http://192.168.100.10:8000"
+      ,
+      "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDBiUBOTtioKhue7DyIorg4lGFfi60qnA0"
     }
   }
 }

@@ -20,12 +20,13 @@ import { Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { Roboto_400Regular } from "@expo-google-fonts/roboto";
 import { supabase } from "../services/supabaseClient";
 
+// Black & Yellow palette
 const GOLD = "#FFDE59";
-const GREEN = "#7ED957";
+const YELLOW_GLOW = "rgba(255, 209, 102, 0.45)";
 const AMBER = "#FFB84D";
 const RED = "#FF4D4D";
 
-// Email helpers (kept from your version)
+// Email helpers
 const ZW_SPACES = /[\s\u200B\u200C\u200D\uFEFF]/g;
 const normalizeEmail = (v: string) =>
   v.normalize("NFKC").replace(ZW_SPACES, "").trim().toLowerCase();
@@ -41,7 +42,7 @@ export default function ForgotPasswordScreen() {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  // Animations (match Spark card + glow)
+  // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const scaleAnim = useRef(new Animated.Value(0.98)).current;
@@ -98,7 +99,7 @@ export default function ForgotPasswordScreen() {
     }
     setSending(true);
     try {
-      // Verify the email exists in our users table before sending reset link
+      // Verify the email exists in our users table
       const { data: rows, error: findErr } = await supabase
         .from("users")
         .select("user_id")
@@ -110,16 +111,15 @@ export default function ForgotPasswordScreen() {
         return;
       }
       if (!rows || rows.length === 0) {
-        Alert.alert("Not registered", "This email you entered is not registered.");
+        Alert.alert("Not registered", "The email you entered is not registered.");
         return;
       }
 
       await supabase.auth.resetPasswordForEmail(email, {
-        // Deep link directly into the NewPassword screen
         redirectTo: Linking.createURL("/auth/NewPassword"),
       });
 
-      // Censor email locally for UI
+      // Mask email
       const [user, domain] = email.split("@");
       const masked =
         user && domain ? `${user.slice(0, 2)}****${user.slice(-2)}@${domain}` : email;
@@ -148,25 +148,32 @@ export default function ForgotPasswordScreen() {
         >
           <Animated.View
             style={[
-              styles.glowWrap, // same “bubble” container as Login
+              styles.glowWrap,
               {
                 transform: [
-                  { scale: glowOpacity.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
+                  {
+                    scale: glowOpacity.interpolate({
+                      inputRange: [0.9, 1],
+                      outputRange: [1, 1.015],
+                    }),
+                  },
                 ],
               },
             ]}
           >
-            {/* Simulated glow layer */}
+            {/* Glow layer */}
             <Animated.View style={[styles.glowLayer, { opacity: glowOpacity }]} pointerEvents="none">
               <LinearGradient
-                colors={[GREEN + "33", GOLD + "22", "transparent"]}
+                colors={[GOLD + "33", GOLD + "18", "transparent"]}
                 start={{ x: 0.3, y: 0 }}
                 end={{ x: 0.7, y: 1 }}
                 style={styles.glowGradient}
               />
             </Animated.View>
+
+            {/* Yellow-only border */}
             <LinearGradient
-              colors={[GOLD, GREEN]}
+              colors={[GOLD, GOLD]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.cardWrapper}
@@ -189,7 +196,9 @@ export default function ForgotPasswordScreen() {
                       Enter your email and we’ll send a reset link.
                     </Text>
 
-                    <Animated.View style={{ width: "100%", transform: [{ translateX: shakeEmailX }] }}>
+                    <Animated.View
+                      style={{ width: "100%", transform: [{ translateX: shakeEmailX }] }}
+                    >
                       <TextInput
                         style={[styles.input, !!emailErr && styles.inputError]}
                         placeholder="Email"
@@ -203,10 +212,15 @@ export default function ForgotPasswordScreen() {
 
                     {!!emailErr && <Text style={styles.errorText}>{emailErr}</Text>}
 
-                    {/* Main filled button (same as Login) */}
-                    <TouchableOpacity onPress={handleSendLink} activeOpacity={0.9} disabled={sending} style={{ width: "100%" }}>
+                    {/* Main button */}
+                    <TouchableOpacity
+                      onPress={handleSendLink}
+                      activeOpacity={0.9}
+                      disabled={sending}
+                      style={{ width: "100%" }}
+                    >
                       <LinearGradient
-                        colors={[GOLD, GREEN]}
+                        colors={[GOLD, GOLD]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={[styles.mainButton, sending && { opacity: 0.7 }]}
@@ -217,7 +231,7 @@ export default function ForgotPasswordScreen() {
                       </LinearGradient>
                     </TouchableOpacity>
 
-                    {/* Outline button (same as Login) */}
+                    {/* Outline button */}
                     <TouchableOpacity
                       style={styles.outlineButton}
                       onPress={() => router.push("/auth/LoginPage")}
@@ -240,10 +254,13 @@ export default function ForgotPasswordScreen() {
                       {"\n"}Please check your inbox (and spam folder).
                     </Text>
 
-                    {/* Main filled button (same as Login) */}
-                    <TouchableOpacity onPress={() => router.push("/auth/LoginPage")} activeOpacity={0.9} style={{ width: "100%" }}>
+                    <TouchableOpacity
+                      onPress={() => router.push("/auth/LoginPage")}
+                      activeOpacity={0.9}
+                      style={{ width: "100%" }}
+                    >
                       <LinearGradient
-                        colors={[GOLD, GREEN]}
+                        colors={[GOLD, GOLD]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.mainButton}
@@ -252,7 +269,6 @@ export default function ForgotPasswordScreen() {
                       </LinearGradient>
                     </TouchableOpacity>
 
-                    {/* Outline again, in case they want to resend */}
                     <TouchableOpacity
                       style={styles.outlineButton}
                       onPress={() => setSentTo(null)}
@@ -263,7 +279,8 @@ export default function ForgotPasswordScreen() {
                         adjustsFontSizeToFit
                         minimumFontScale={0.85}
                       >
-                        Didn’t get it? <Text style={styles.linkText}>Try another email</Text>
+                        Didn’t get it?{" "}
+                        <Text style={styles.linkText}>Try another email</Text>
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -280,14 +297,19 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   background: { flex: 1, backgroundColor: "#000" },
   overlay: { ...StyleSheet.absoluteFillObject },
-  container: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
 
-  // === Bubble layout EXACTLY like your LoginPage ===
+  // Bubble like LoginPage, but yellow
   glowWrap: {
     width: "92%",
     alignSelf: "center",
     borderRadius: 50,
-    shadowColor: GREEN,
+    shadowColor: GOLD,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
   },
@@ -315,7 +337,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     alignItems: "center",
   },
-  // ================================================
 
   backButton: { position: "absolute", top: 20, left: 20 },
 
@@ -325,7 +346,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     textAlign: "center",
     marginBottom: 10,
-    textShadowColor: "rgba(255, 222, 89, 0.45)",
+    textShadowColor: YELLOW_GLOW,
     textShadowRadius: 10,
   },
   subtitle: {
@@ -364,7 +385,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // === Buttons copied from your LoginPage ===
   mainButton: {
     width: "100%",
     paddingVertical: 16,
@@ -386,16 +406,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 28,
     borderWidth: 2,
-    borderColor: GREEN,
+    borderColor: GOLD,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
   },
   outlineButtonText: {
-    color: GREEN,
+    color: GOLD,
     fontWeight: "700",
     fontSize: 16,
     textAlign: "center",
   },
-  linkText: { color: GREEN, textDecorationLine: "underline" },
+  linkText: { color: GOLD, textDecorationLine: "underline" },
 });

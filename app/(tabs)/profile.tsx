@@ -7,10 +7,11 @@ import * as Location from "expo-location";
 import { supabase } from "../services/supabaseClient";
 import { useRouter } from "expo-router";
 
+// 🎨 Use same yellow as SavedScreen
+const GOLD = "#FFD166";          // main accent
+const GREEN = "#FFD166";         // was neutral gray; now yellow accent
+const LOGOUT_GREEN = "#FFD166";  // was green; now yellow accent
 
-const GOLD = "#FFDE59";
-const GREEN = "#9CA3AF"; // neutral gray accent
-const LOGOUT_GREEN = "#7ED957"; // subtle green for logout pill
 
 const AVATARS = [
   { key: "avatar1", url: "https://fakqwgyvbqhonwfufhxg.supabase.co/storage/v1/object/sign/avatars/avatar1.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWZlNGUwNi0zNTA1LTQ2YmUtYTgzZi1jMzAzY2Q4MzE2YjMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJhdmF0YXJzL2F2YXRhcjEucG5nIiwiaWF0IjoxNzYyODgzODQ5LCJleHAiOjE3OTQ0MTk4NDl9.ibrb-VmSpLWCl3jrS-nrcRbSleVS3tiSPtdOJCfWkCg" },

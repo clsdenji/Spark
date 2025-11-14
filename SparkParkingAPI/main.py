@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from math import radians, sin, cos, asin, sqrt
 import re
 
@@ -8,6 +8,11 @@ from pydantic import BaseModel
 import joblib
 import numpy as np
 import pandas as pd
+import os
+import json
+from urllib import request as urlrequest
+from urllib.parse import urlencode
+from urllib.error import URLError
 
 
 # =========================
@@ -230,6 +235,33 @@ class ParkingRequest(BaseModel):
 
 
 # =========================
+# Routing models
+# =========================
+
+class LatLon(BaseModel):
+    lat: float
+    lon: float
+
+class EtaRequest(BaseModel):
+    origin: LatLon
+    destination: LatLon
+    mode: str  # 'car' | 'walk' | 'motor' | 'commute'
+    departAt: Optional[str] = None
+
+class RouteRequest(BaseModel):
+    origin: LatLon
+    destination: LatLon
+    mode: str
+    stops: Optional[List[LatLon]] = None
+
+class OptimizeRequest(BaseModel):
+    origin: LatLon
+    destination: LatLon
+    stops: List[LatLon]
+    mode: str
+
+
+# =========================
 # Endpoints
 # =========================
 
@@ -346,3 +378,173 @@ def recommend(req: ParkingRequest, top_k: int = 5):
         },
         "recommendations": results,
     }
+
+
+# Email notification endpoint removed per request; keeping API minimal.
+
+
+# =========================
+# Optional ML routing hooks (if present)
+# =========================
+HAS_ROUTER = False
+try:
+    # If you have an internal routing module, expose compatible callables here
+    # with signatures:
+    #   ml_eta(origin: Tuple[float,float], destination: Tuple[float,float], mode: str) -> float
+    #   ml_route(origin: Tuple[float,float], destination: Tuple[float,float], mode: str, stops: Optional[List[Tuple[float,float]]]) -> Tuple[List[Tuple[float,float]], Optional[float]]
+    #   ml_optimize(origin: Tuple[float,float], stops: List[Tuple[float,float]], destination: Tuple[float,float], mode: str) -> Tuple[List[Tuple[float,float]], Optional[List[Tuple[float,float]]], Optional[float]]
+    from router_ml import ml_eta, ml_route, ml_optimize  # type: ignore
+    HAS_ROUTER = True
+except Exception:
+    HAS_ROUTER = False
+
+
+# =========================
+# OSRM helpers (fallback)
+# =========================
+
+def _mode_to_osrm(mode: str) -> str:
+    m = (mode or '').lower()
+    if m == 'walk':
+        return 'walking'
+    return 'driving'  # 'car' and 'motor' map to driving; 'commute' unsupported
+
+def _http_get_json(url: str, timeout: float = 8.0) -> Dict[str, Any]:
+    req = urlrequest.Request(url, headers={"User-Agent": "Spark/1.0"})
+    with urlrequest.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+        return json.loads(raw.decode('utf-8'))
+
+def _osrm_route(profile: str, origin: Tuple[float,float], destination: Tuple[float,float]) -> Tuple[List[List[float]], Optional[float]]:
+    # coords are (lat, lon)
+    o_lat, o_lon = origin
+    d_lat, d_lon = destination
+    url = (
+        f"https://router.project-osrm.org/route/v1/{profile}/"
+        f"{o_lon},{o_lat};{d_lon},{d_lat}?overview=full&geometries=geojson"
+    )
+    data = _http_get_json(url)
+    coords = data.get('routes', [{}])[0].get('geometry', {}).get('coordinates', [])
+    duration = data.get('routes', [{}])[0].get('duration')
+    return coords, float(duration) if isinstance(duration, (int,float)) else None
+
+def _osrm_trip(profile: str, points: List[Tuple[float,float]]) -> Tuple[List[List[float]], List[Tuple[float,float]], Optional[float]]:
+    # OSRM expects lon,lat pairs
+    if not points:
+        return [], [], None
+    coord_str = ';'.join([f"{lon},{lat}" for (lat, lon) in points])
+    url = (
+        f"https://router.project-osrm.org/trip/v1/{profile}/"
+        f"{coord_str}?source=first&destination=last&roundtrip=false&geometries=geojson"
+    )
+    data = _http_get_json(url)
+    trip = (data.get('trips') or [None])[0]
+    coords = (trip or {}).get('geometry', {}).get('coordinates', [])
+    duration = (trip or {}).get('duration')
+    waypoints = data.get('waypoints') or []
+    ordered = [(w['location'][1], w['location'][0]) for w in waypoints] if waypoints else points
+    return coords, ordered, float(duration) if isinstance(duration, (int,float)) else None
+
+
+# =========================
+# Routing endpoints
+# =========================
+
+@app.post('/eta')
+def eta(req: EtaRequest):
+    origin = (req.origin.lat, req.origin.lon)
+    destination = (req.destination.lat, req.destination.lon)
+    mode = req.mode
+    # Try ML router first, then OSRM
+    if HAS_ROUTER:
+        try:
+            seconds = ml_eta(origin, destination, mode)  # type: ignore
+            if isinstance(seconds, (int, float)) and seconds >= 0:
+                return {"seconds": float(seconds)}
+        except Exception:
+            pass
+    try:
+        profile = _mode_to_osrm(mode)
+        _, duration = _osrm_route(profile, origin, destination)
+        return {"seconds": float(duration) if duration is not None else None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ETA failed: {e}")
+
+
+@app.post('/route')
+def route(req: RouteRequest):
+    origin = (req.origin.lat, req.origin.lon)
+    destination = (req.destination.lat, req.destination.lon)
+    stops = [(s.lat, s.lon) for s in (req.stops or [])]
+    mode = req.mode
+    if HAS_ROUTER:
+        try:
+            geom, duration = ml_route(origin, destination, mode, stops if stops else None)  # type: ignore
+            # Expect geom as list of (lat,lon) or (lon,lat); try to normalize to [lon,lat]
+            coords: List[List[float]] = []
+            for g in geom or []:
+                if isinstance(g, (list, tuple)) and len(g) >= 2:
+                    a, b = float(g[0]), float(g[1])
+                    # If looks like lat,lon (lat within [-90,90]), convert to lon,lat
+                    if -90.0 <= a <= 90.0 and -180.0 <= b <= 180.0:
+                        coords.append([b, a])
+                    else:
+                        coords.append([a, b])
+            return {"geometry": coords, "durationSeconds": float(duration) if duration is not None else None}
+        except Exception:
+            pass
+    try:
+        profile = _mode_to_osrm(mode)
+        if stops:
+            pts = [origin] + stops + [destination]
+            coords, _, duration = _osrm_trip(profile, pts)
+        else:
+            coords, duration = _osrm_route(profile, origin, destination)
+        return {"geometry": coords, "durationSeconds": float(duration) if duration is not None else None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Route failed: {e}")
+
+
+@app.post('/optimize')
+def optimize(req: OptimizeRequest):
+    origin = (req.origin.lat, req.origin.lon)
+    destination = (req.destination.lat, req.destination.lon)
+    stops = [(s.lat, s.lon) for s in req.stops]
+    mode = req.mode
+    if HAS_ROUTER:
+        try:
+            ordered_pts, geom, duration = ml_optimize(origin, stops, destination, mode)  # type: ignore
+            ordered_latlon = [
+                {"latitude": float(lat), "longitude": float(lon)} for (lat, lon) in (ordered_pts or [])
+            ]
+            coords: Optional[List[List[float]]] = None
+            if geom is not None:
+                coords = []
+                for g in geom:
+                    if isinstance(g, (list, tuple)) and len(g) >= 2:
+                        a, b = float(g[0]), float(g[1])
+                        if -90.0 <= a <= 90.0 and -180.0 <= b <= 180.0:
+                            coords.append([b, a])
+                        else:
+                            coords.append([a, b])
+            return {
+                "ordered": ordered_latlon,
+                "geometry": coords or [],
+                "durationSeconds": float(duration) if duration is not None else None,
+            }
+        except Exception:
+            pass
+    try:
+        profile = _mode_to_osrm(mode)
+        pts = [origin] + stops + [destination]
+        coords, ordered_pts, duration = _osrm_trip(profile, pts)
+        ordered_latlon = [
+            {"latitude": float(lat), "longitude": float(lon)} for (lat, lon) in ordered_pts
+        ]
+        return {
+            "ordered": ordered_latlon,
+            "geometry": coords,
+            "durationSeconds": float(duration) if duration is not None else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Optimize failed: {e}")

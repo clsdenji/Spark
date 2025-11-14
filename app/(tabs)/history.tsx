@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     marginBottom: HP(1.5),
   },
   recentTitle: {
-    color: "#7ED957",
+    color: "#FFD166",
     fontSize: Math.max(18, WP(5)),
     fontWeight: "700",
     flexShrink: 1,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     fontSize: Math.max(12, WP(3.5)),
   },
   empty: {
-    color: "#888",
+    color: "#FFD166",
     textAlign: "center",
     marginTop: HP(3),
     fontSize: Math.max(13, WP(3.8)),
@@ -175,28 +175,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: HP(1.2),
   },
-
-  // square item styles
   squareItem: {
-    width: "48%",            // two items per row
-    aspectRatio: 1.05,       // slightly taller than wide
+    width: "48%",
+    aspectRatio: 1.05,
     marginBottom: HP(1.2),
     borderRadius: Math.round(WP(2)),
-    backgroundColor: "#0d0d0d",
+    backgroundColor: "#222",
     padding: WP(3),
     justifyContent: "space-between",
-     // subtle elevation/shadow
-     ...Platform.select({
-       ios: {
-         shadowColor: "#000",
-         shadowOffset: { width: 0, height: 4 },
-         shadowOpacity: 0.25,
-         shadowRadius: 6,
-       },
-       android: {
-         elevation: 3,
-       },
-     }),
+    ...Platform.select({
+      ios: {
+        shadowColor: "#444", // gray shadow outline
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   squareContent: {
     flex: 1,
@@ -211,16 +208,15 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   squareSub: {
-    color: "#aaa",
+    color: "#FFD166",
     fontSize: Math.max(12, WP(4.0)),
     flexShrink: 1,
   },
   squareTime: {
-    color: "#888",
+    color: "#FFD166",
     fontSize: Math.max(10, WP(3.4)),
     alignSelf: "flex-end",
   },
-
   // legacy row styles left for compatibility (unused)
   row: {
     flexDirection: "row",
@@ -228,7 +224,7 @@ const styles = StyleSheet.create({
     paddingVertical: HP(1.6),
     paddingHorizontal: WP(2.5),
     borderRadius: Math.round(WP(2)),
-    backgroundColor: "#0d0d0d",
+    backgroundColor: "#222",
     marginBottom: HP(0.8),
   },
   name: {
@@ -237,12 +233,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   sub: {
-    color: "#aaa",
+    color: "#FFD166",
     fontSize: Math.max(11, WP(3.6)),
     marginTop: HP(0.4),
   },
   time: {
-    color: "#888",
+    color: "#FFD166",
     fontSize: Math.max(10, WP(3.4)),
     marginLeft: WP(3),
   },

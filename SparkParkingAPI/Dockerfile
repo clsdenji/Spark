@@ -27,3 +27,17 @@ EXPOSE 8000
 
 # Use shell form to allow env var expansion for PORT
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+
+# .env.template - list of env vars (do NOT put secrets here)
+FROM_EMAIL=
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+DATABASE_URL=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=
+MODEL_S3_BUCKET=
+MODEL_S3_PATH=
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=

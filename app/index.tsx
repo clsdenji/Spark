@@ -1,11 +1,17 @@
-// app/AuthSplashScreen.tsx (or .tsx)
-// If using .jsx, remove the `type` imports and the `: Type` annotations.
+// app/AuthSplashScreen.tsx
 
 import React, { useEffect, useRef, useState, type FC } from "react";
-import { View, StyleSheet, Animated, Easing, Platform } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Easing,
+  Platform,
+  StatusBar,
+  SafeAreaView,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { MuseoModerno_700Bold } from "@expo-google-fonts/museomoderno";
 import { supabase } from "./services/supabaseClient";
@@ -13,10 +19,16 @@ import { supabase } from "./services/supabaseClient";
 // --- Types for Animated values (TS only) ---
 import type { Animated as RNAnimated } from "react-native";
 
-const GREEN = "#7ED957";
-const GOLD = "#FFDE59";
-const GREEN_GLOW = "rgba(126, 217, 87, 0.55)";
-const GOLD_GLOW = "rgba(255, 222, 89, 0.55)";
+// --- Black & Yellow Theme (Spark standard theme) ---
+const YELLOW = "#FFD166"; // main accent
+const YELLOW_GLOW = "rgba(255, 209, 102, 0.55)"; // soft golden glow
+
+// Map old names to new palette (for reuse in code)
+const GREEN = YELLOW;
+const GOLD = YELLOW;
+const GREEN_GLOW = YELLOW_GLOW;
+const GOLD_GLOW = YELLOW_GLOW;
+
 const TRACK_WIDTH = 280;
 const BUFFER = 140;
 const PASS = TRACK_WIDTH + BUFFER;
@@ -26,12 +38,19 @@ export default function AuthSplashScreen() {
   const router = useRouter();
   const [sessionChecked, setSessionChecked] = useState(false);
 
+  // Entry animation
   const inOpacity = useRef(new Animated.Value(0)).current;
   const inScale = useRef(new Animated.Value(0.96)).current;
+
+  // Fade out + veil
   const contentOpacity = useRef(new Animated.Value(1)).current;
   const veilOpacity = useRef(new Animated.Value(0)).current;
+
+  // Sliding neon words
   const greenX = useRef(new Animated.Value(-PASS)).current;
   const yellowX = useRef(new Animated.Value(+PASS)).current;
+
+  // Neon pulse
   const neonPulse = useRef(new Animated.Value(0.9)).current;
 
   const [fontsLoaded] = useFonts({ MuseoModerno_700Bold });
@@ -52,6 +71,7 @@ export default function AuthSplashScreen() {
   useEffect(() => {
     if (!fontsLoaded || !sessionChecked) return;
 
+    // Intro scale + fade
     Animated.parallel([
       Animated.timing(inOpacity, {
         toValue: 1,
@@ -67,6 +87,7 @@ export default function AuthSplashScreen() {
       }),
     ]).start();
 
+    // Sliding words left/right
     Animated.parallel([
       Animated.timing(greenX, {
         toValue: +PASS,
@@ -82,13 +103,25 @@ export default function AuthSplashScreen() {
       }),
     ]).start();
 
+    // Looping neon pulse
     Animated.loop(
       Animated.sequence([
-        Animated.timing(neonPulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(neonPulse, { toValue: 0.85, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(neonPulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(neonPulse, {
+          toValue: 0.85,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
       ])
     ).start();
 
+    // Fade out and navigate
     const t = setTimeout(() => {
       Animated.parallel([
         Animated.timing(contentOpacity, {
@@ -105,7 +138,6 @@ export default function AuthSplashScreen() {
         }),
       ]).start(({ finished }) => {
         if (finished) {
-          // Go directly to LoginPage when done
           router.replace("/auth/LoginPage");
         }
       });
@@ -118,34 +150,56 @@ export default function AuthSplashScreen() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={["#000000", "#07090B", "#000000"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.container}
-      >
-        <Animated.View style={[styles.center, { opacity: inOpacity, transform: [{ scale: inScale }] }]}>
-          <Animated.View style={{ opacity: contentOpacity, alignItems: "center" }}>
-            <View style={[styles.track, { width: TRACK_WIDTH }]}>
-              <NeonWord text="Spark" color={GREEN} glow={GREEN_GLOW} translateX={greenX} pulse={neonPulse} top={2} />
-              <NeonWord text="Spark" color={GOLD} glow={GOLD_GLOW} translateX={yellowX} pulse={neonPulse} />
-              <NeonBolt pulse={neonPulse} />
-            </View>
+      <SafeAreaView style={styles.safe}>
+        <LinearGradient
+          colors={["#000000", "#07090B", "#000000"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.container}
+        >
+          <Animated.View
+            style={[
+              styles.center,
+              { opacity: inOpacity, transform: [{ scale: inScale }] },
+            ]}
+          >
+            <Animated.View
+              style={{ opacity: contentOpacity, alignItems: "center" }}
+            >
+              <View style={[styles.track, { width: TRACK_WIDTH }]}>
+                {/* Both words are yellow now, sliding opposite directions */}
+                <NeonWord
+                  text="Spark"
+                  color={YELLOW}
+                  glow={YELLOW_GLOW}
+                  translateX={greenX}
+                  pulse={neonPulse}
+                  top={2}
+                />
+                <NeonWord
+                  text="Spark"
+                  color={YELLOW}
+                  glow={YELLOW_GLOW}
+                  translateX={yellowX}
+                  pulse={neonPulse}
+                />
+                <NeonBolt pulse={neonPulse} />
+              </View>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
 
-        <Animated.View pointerEvents="none" style={[styles.veil, { opacity: veilOpacity }]} />
-
-        {/* Removed LocationPermission overlay */}
-      </LinearGradient>
+          {/* Black veil fade-out */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.veil, { opacity: veilOpacity }]}
+          />
+        </LinearGradient>
+      </SafeAreaView>
     </View>
   );
 }
 
 /** ---------- Neon helpers with types ---------- */
-
-// TS: use RNAnimated.Value as the type for Animated values.
-// JS: delete the type annotations and the import 'type { Animated as RNAnimated }'.
 
 type NeonWordProps = {
   text: string;
@@ -156,9 +210,18 @@ type NeonWordProps = {
   top?: number;
 };
 
-const NeonWord: FC<NeonWordProps> = ({ text, color, glow, translateX, pulse, top = 0 }) => {
+const NeonWord: FC<NeonWordProps> = ({
+  text,
+  color,
+  glow,
+  translateX,
+  pulse,
+  top = 0,
+}) => {
   return (
-    <Animated.View style={[styles.neonWrap, { transform: [{ translateX }] }, { top }]}>
+    <Animated.View
+      style={[styles.neonWrap, { transform: [{ translateX }] }, { top }]}
+    >
       {/* Aura (bigger, softer) */}
       <Animated.Text
         style={[
@@ -201,7 +264,7 @@ const NeonBolt: FC<NeonBoltProps> = ({ pulse }) => {
       style={[
         styles.bolt,
         {
-          textShadowColor: GOLD_GLOW,
+          textShadowColor: YELLOW_GLOW,
           opacity: pulse as any,
         },
       ]}
@@ -215,6 +278,10 @@ const NeonBolt: FC<NeonBoltProps> = ({ pulse }) => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
+  safe: {
+    flex: 1,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0,
+  },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
@@ -252,7 +319,7 @@ const styles = StyleSheet.create({
   bolt: {
     position: "absolute",
     fontSize: 30,
-    color: GOLD,
+    color: YELLOW,
     textShadowRadius: 16,
     textShadowOffset: { width: 0, height: 0 },
   },

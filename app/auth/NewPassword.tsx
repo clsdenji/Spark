@@ -20,13 +20,15 @@ import { Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { Roboto_400Regular } from "@expo-google-fonts/roboto";
 import { supabase } from "../services/supabaseClient";
 
+// Black & Yellow palette
 const GOLD = "#FFDE59";
-const GREEN = "#7ED957";
+const YELLOW_GLOW = "rgba(255, 209, 102, 0.45)";
 const AMBER = "#FFB84D";
 const RED = "#FF4D4D";
 
 // Password validation: 8+ chars, upper, lower, number, special
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
 export default function NewPasswordScreen() {
   const router = useRouter();
@@ -47,15 +49,35 @@ export default function NewPasswordScreen() {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(glowOpacity, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        Animated.timing(glowOpacity, { toValue: 0.9, duration: 2000, useNativeDriver: true }),
+        Animated.timing(glowOpacity, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowOpacity, {
+          toValue: 0.9,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
@@ -65,9 +87,15 @@ export default function NewPasswordScreen() {
   const onChangePassword = (v: string) => {
     setPassword(v);
     if (v.length === 0) setPasswordErr("");
-    else setPasswordErr(PASSWORD_REGEX.test(v) ? "" : "Password must be 8+ chars, include upper, lower, number & special char.");
+    else
+      setPasswordErr(
+        PASSWORD_REGEX.test(v)
+          ? ""
+          : "Password must be 8+ chars, include upper, lower, number & special char."
+      );
     // Keep mismatch in sync if rePassword has value
-    if (rePassword.length > 0) setRePasswordErr(v === rePassword ? "" : "Passwords do not match.");
+    if (rePassword.length > 0)
+      setRePasswordErr(v === rePassword ? "" : "Passwords do not match.");
   };
 
   const onChangeRePassword = (v: string) => {
@@ -77,7 +105,7 @@ export default function NewPasswordScreen() {
   };
 
   const handleUpdatePassword = async () => {
-    // No prompts here for validation; just inline errors + red outline
+    // No prompts beyond inline errors
     if (!password || !rePassword) {
       if (!password) setPasswordErr("Password is required.");
       if (!rePassword) setRePasswordErr("Please re-enter your password.");
@@ -85,7 +113,10 @@ export default function NewPasswordScreen() {
     }
     const invalid = !PASSWORD_REGEX.test(password);
     const mismatch = password !== rePassword;
-    if (invalid) setPasswordErr("Password must be 8+ chars, include upper, lower, number & special char.");
+    if (invalid)
+      setPasswordErr(
+        "Password must be 8+ chars, include upper, lower, number & special char."
+      );
     if (mismatch) setRePasswordErr("Passwords do not match.");
     if (invalid || mismatch) return;
 
@@ -96,9 +127,11 @@ export default function NewPasswordScreen() {
         Alert.alert("Error", error.message);
         return;
       }
-      Alert.alert("Password updated", "You can now log in with your new password.", [
-        { text: "OK", onPress: () => router.replace("/auth/LoginPage") },
-      ]);
+      Alert.alert(
+        "Password updated",
+        "You can now log in with your new password.",
+        [{ text: "OK", onPress: () => router.replace("/auth/LoginPage") }]
+      );
     } catch (e: any) {
       Alert.alert("Error", e?.message || "Failed to update password.");
     } finally {
@@ -125,22 +158,32 @@ export default function NewPasswordScreen() {
               styles.glowWrap,
               {
                 transform: [
-                  { scale: glowOpacity.interpolate({ inputRange: [0.9, 1], outputRange: [1, 1.015] }) },
+                  {
+                    scale: glowOpacity.interpolate({
+                      inputRange: [0.9, 1],
+                      outputRange: [1, 1.015],
+                    }),
+                  },
                 ],
               },
             ]}
           >
-            {/* Simulated glow layer */}
-            <Animated.View style={[styles.glowLayer, { opacity: glowOpacity }]} pointerEvents="none">
+            {/* Glow layer */}
+            <Animated.View
+              style={[styles.glowLayer, { opacity: glowOpacity }]}
+              pointerEvents="none"
+            >
               <LinearGradient
-                colors={[GREEN + "33", GOLD + "22", "transparent"]}
+                colors={[GOLD + "33", GOLD + "22", "transparent"]}
                 start={{ x: 0.3, y: 0 }}
                 end={{ x: 0.7, y: 1 }}
                 style={styles.glowGradient}
               />
             </Animated.View>
+
+            {/* Yellow-only border */}
             <LinearGradient
-              colors={[GOLD, GREEN]}
+              colors={[GOLD, GOLD]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.cardWrapper}
@@ -148,16 +191,24 @@ export default function NewPasswordScreen() {
               <Animated.View
                 style={[
                   styles.card,
-                  { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] },
+                  {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+                  },
                 ]}
               >
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => router.back()}
+                >
                   <Ionicons name="arrow-back" size={26} color={GOLD} />
                 </TouchableOpacity>
 
                 <Text style={styles.title}>Set New Password</Text>
 
-                <Text style={styles.subtitle}>Enter and confirm your new password.</Text>
+                <Text style={styles.subtitle}>
+                  Enter and confirm your new password.
+                </Text>
 
                 <TextInput
                   style={[styles.input, !!passwordErr && styles.inputError]}
@@ -167,7 +218,9 @@ export default function NewPasswordScreen() {
                   value={password}
                   onChangeText={onChangePassword}
                 />
-                {!!passwordErr && <Text style={styles.errorText}>{passwordErr}</Text>}
+                {!!passwordErr && (
+                  <Text style={styles.errorText}>{passwordErr}</Text>
+                )}
 
                 <TextInput
                   style={[styles.input, !!rePasswordErr && styles.inputError]}
@@ -177,11 +230,18 @@ export default function NewPasswordScreen() {
                   value={rePassword}
                   onChangeText={onChangeRePassword}
                 />
-                {!!rePasswordErr && <Text style={styles.errorText}>{rePasswordErr}</Text>}
+                {!!rePasswordErr && (
+                  <Text style={styles.errorText}>{rePasswordErr}</Text>
+                )}
 
-                <TouchableOpacity onPress={handleUpdatePassword} activeOpacity={0.9} disabled={updating}>
+                <TouchableOpacity
+                  onPress={handleUpdatePassword}
+                  activeOpacity={0.9}
+                  disabled={updating}
+                  style={{ width: "100%" }}
+                >
                   <LinearGradient
-                    colors={[GOLD, GREEN]}
+                    colors={[GOLD, GOLD]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={[styles.mainButton, updating && { opacity: 0.7 }]}
@@ -203,13 +263,18 @@ export default function NewPasswordScreen() {
 const styles = StyleSheet.create({
   background: { flex: 1, backgroundColor: "#000" },
   overlay: { ...StyleSheet.absoluteFillObject },
-  container: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
 
   glowWrap: {
     width: "92%",
     alignSelf: "center",
     borderRadius: 40,
-    shadowColor: GREEN,
+    shadowColor: GOLD,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
   },
@@ -230,6 +295,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 28,
     alignItems: "center",
+    width: "100%",
   },
 
   backButton: { position: "absolute", top: 20, left: 20 },
@@ -240,7 +306,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_700Bold",
     textAlign: "center",
     marginBottom: 10,
-    textShadowColor: "rgba(255, 222, 89, 0.45)",
+    textShadowColor: YELLOW_GLOW,
     textShadowRadius: 10,
   },
   subtitle: {
