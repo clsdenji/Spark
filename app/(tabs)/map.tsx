@@ -274,7 +274,38 @@ const MapScreen: React.FC = () => {
     setReportConcern('');
     setReportDescription('');
     setAttachments([]);
+
   };
+
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean | null>(null);
+
+  useEffect(() => {
+  const checkLocationPermission = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    setLocationPermissionGranted(status === 'granted');
+    if (status === 'granted') {
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      });
+    }
+  };
+
+  if (locationPermissionGranted === null) {
+    checkLocationPermission(); // Only ask once when the component first mounts
+  }
+}, [locationPermissionGranted]);
+useEffect(() => {
+  if (locationPermissionGranted === false) {
+    Alert.alert('Location Permission Denied', 'You can enable it in settings.');
+  }
+}, [locationPermissionGranted]);
+if (locationPermissionGranted === null) {
+  // Still checking permission, render nothing or a loading spinner
+  return <ActivityIndicator size="large" color="#FFD166" />;
+}
+
 
   useEffect(() => {
     // no auto-location on mount

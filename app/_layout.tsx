@@ -1,10 +1,10 @@
-// app/_layout.tsx
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import * as Location from "expo-location";
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -24,6 +24,8 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean | null>(null);
+
   // Check for font loading errors
   useEffect(() => {
     if (error) throw error;
@@ -34,13 +36,22 @@ export default function RootLayout() {
     if (loaded) SplashScreen.hideAsync();
   }, [loaded]);
 
-  // Return nothing until fonts are loaded
-  if (!loaded) return null;
+  // Check for location permission
+  useEffect(() => {
+    const checkLocationPermission = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermissionGranted(status === 'granted');
+    };
+    checkLocationPermission();
+  }, []);
 
-  return <RootLayoutNav />;
+  // Return nothing until fonts are loaded or permission check is done
+  if (!loaded || locationPermissionGranted === null) return null;
+
+  return <RootLayoutNav locationPermissionGranted={locationPermissionGranted} />;
 }
 
-function RootLayoutNav() {
+function RootLayoutNav({ locationPermissionGranted }: { locationPermissionGranted: boolean }) {
   const colorScheme = useColorScheme();  // Custom hook for detecting theme
 
   // Force a black background for all navigation scenes to avoid white flashes
@@ -65,6 +76,11 @@ function RootLayoutNav() {
           {/* Define stack screens and apply fade transition */}
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
+          {locationPermissionGranted ? (
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+          ) : (
+            <Stack.Screen name="userPermissionLocation" options={{ headerShown: false }} />
+          )}
           <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '' }} />
         </Stack>
       </ThemeProvider>

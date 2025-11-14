@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 from math import radians, sin, cos, asin, sqrt
 import re
 
@@ -13,6 +13,7 @@ import json
 from urllib import request as urlrequest
 from urllib.parse import urlencode
 from urllib.error import URLError
+import logging
 
 
 # =========================
@@ -288,263 +289,49 @@ def recommend(req: ParkingRequest, top_k: int = 5):
       [distance_km, open_now, cctvs, guards,
        initial_rate, pwd_discount, street_parking]
     """
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model not loaded.")
-    if not PARKINGS:
-        raise HTTPException(status_code=500, detail="No parking data loaded from Excel.")
+    print(f"Received request: {req}")  # Log the incoming request data
 
-    feature_rows: List[List[float]] = []
-    parking_info: List[Dict[str, Any]] = []
+    if model is None:
+        print("Model not loaded.")
+        raise HTTPException(status_code=500, detail="Model not loaded.")
+    
+    feature_rows = []
+    parking_info = []
 
     for idx, p in enumerate(PARKINGS):
         try:
             lat = float(p["lat"])
             lng = float(p["lng"])
-        except Exception:
-            # skip if we somehow don't have valid coords
-            continue
+            dist_km = haversine_km(req.user_lat, req.user_lng, lat, lng)
+            # Other feature processing...
 
-        dist_km = haversine_km(req.user_lat, req.user_lng, lat, lng)
-        opening = p.get("opening", None)
-        closing = p.get("closing", None)
-        open_now = compute_open_now(opening, closing, req.time_of_day)
-
-        cctvs = yn_to_int(p.get("cctvs_raw", p.get("CCTVS", "")))
-        guards = yn_to_int(p.get("guards_raw", p.get("GUARDS", "")))
-        initial_rate = rate_to_float(p.get("initial_rate_raw", p.get("INITIAL RATE", "")))
-        pwd_discount = discount_to_int(p.get("discount_raw", p.get("PWD/SC DISCOUNT", "")))
-        street_parking = yn_to_int(p.get("street_raw", p.get("STREET PARKING", "")))
-
-        # Build feature row in EXACT order used in training
-        row = [
-            dist_km,
-            open_now,
-            cctvs,
-            guards,
-            initial_rate,
-            pwd_discount,
-            street_parking,
-        ]
-
-        feature_rows.append(row)
-
-        # store display info for response
-        parking_info.append({
-            "index": idx,
-            "name": p.get("name"),
-            "details": p.get("details"),
-            "address": p.get("address"),
-            "link": p.get("link"),
-            "city": p.get("city"),
-            "lat": lat,
-            "lng": lng,
-            "distance_km": dist_km,
-            "open_now": bool(open_now),
-            "opening": p.get("opening"),
-            "closing": p.get("closing"),
-            "guards": guards,
-            "cctvs": cctvs,
-            "initial_rate": initial_rate,
-            "pwd_discount": pwd_discount,
-            "street_parking": street_parking,
-        })
+            feature_rows.append([dist_km, open_now, cctvs, guards, initial_rate, pwd_discount, street_parking])
+            parking_info.append({
+                "name": p["name"],
+                "lat": lat,
+                "lng": lng,
+                "address": p["address"]
+            })
+        except Exception as e:
+            print(f"Error processing parking {p['name']}: {e}")  # Log errors while processing parking data
+            continue  # Continue processing other parkings
 
     if not feature_rows:
-        raise HTTPException(status_code=500, detail="No valid parking rows to score.")
-
+        print("No valid feature rows found.")
+        raise HTTPException(status_code=500, detail="No valid feature rows to score.")
+    
     X = np.array(feature_rows, dtype=float)
 
     try:
+        print("Making predictions...")  # Log before making predictions
         scores = model.predict(X)
+        print(f"Predictions: {scores}")  # Log the predictions
     except Exception as e:
+        print(f"Model prediction failed: {str(e)}")  # Log any prediction failures
         raise HTTPException(status_code=500, detail=f"Model prediction failed: {str(e)}")
 
-    # Attach scores
-    results = []
-    for info, score in zip(parking_info, scores):
-        info_with_score = dict(info)
-        info_with_score["score"] = float(score)
-        results.append(info_with_score)
+    results = [{"name": p["name"], "score": score} for p, score in zip(parking_info, scores)]
+    results = sorted(results, key=lambda r: r["score"], reverse=True)[:top_k]
 
-    # Sort by score DESC and take top_k
-    results.sort(key=lambda r: r["score"], reverse=True)
-    results = results[:top_k]
-
-    return {
-        "user_location": {
-            "lat": req.user_lat,
-            "lng": req.user_lng,
-            "time_of_day": req.time_of_day,
-        },
-        "recommendations": results,
-    }
-
-
-# Email notification endpoint removed per request; keeping API minimal.
-
-
-# =========================
-# Optional ML routing hooks (if present)
-# =========================
-HAS_ROUTER = False
-try:
-    # If you have an internal routing module, expose compatible callables here
-    # with signatures:
-    #   ml_eta(origin: Tuple[float,float], destination: Tuple[float,float], mode: str) -> float
-    #   ml_route(origin: Tuple[float,float], destination: Tuple[float,float], mode: str, stops: Optional[List[Tuple[float,float]]]) -> Tuple[List[Tuple[float,float]], Optional[float]]
-    #   ml_optimize(origin: Tuple[float,float], stops: List[Tuple[float,float]], destination: Tuple[float,float], mode: str) -> Tuple[List[Tuple[float,float]], Optional[List[Tuple[float,float]]], Optional[float]]
-    from router_ml import ml_eta, ml_route, ml_optimize  # type: ignore
-    HAS_ROUTER = True
-except Exception:
-    HAS_ROUTER = False
-
-
-# =========================
-# OSRM helpers (fallback)
-# =========================
-
-def _mode_to_osrm(mode: str) -> str:
-    m = (mode or '').lower()
-    if m == 'walk':
-        return 'walking'
-    return 'driving'  # 'car' and 'motor' map to driving; 'commute' unsupported
-
-def _http_get_json(url: str, timeout: float = 8.0) -> Dict[str, Any]:
-    req = urlrequest.Request(url, headers={"User-Agent": "Spark/1.0"})
-    with urlrequest.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read()
-        return json.loads(raw.decode('utf-8'))
-
-def _osrm_route(profile: str, origin: Tuple[float,float], destination: Tuple[float,float]) -> Tuple[List[List[float]], Optional[float]]:
-    # coords are (lat, lon)
-    o_lat, o_lon = origin
-    d_lat, d_lon = destination
-    url = (
-        f"https://router.project-osrm.org/route/v1/{profile}/"
-        f"{o_lon},{o_lat};{d_lon},{d_lat}?overview=full&geometries=geojson"
-    )
-    data = _http_get_json(url)
-    coords = data.get('routes', [{}])[0].get('geometry', {}).get('coordinates', [])
-    duration = data.get('routes', [{}])[0].get('duration')
-    return coords, float(duration) if isinstance(duration, (int,float)) else None
-
-def _osrm_trip(profile: str, points: List[Tuple[float,float]]) -> Tuple[List[List[float]], List[Tuple[float,float]], Optional[float]]:
-    # OSRM expects lon,lat pairs
-    if not points:
-        return [], [], None
-    coord_str = ';'.join([f"{lon},{lat}" for (lat, lon) in points])
-    url = (
-        f"https://router.project-osrm.org/trip/v1/{profile}/"
-        f"{coord_str}?source=first&destination=last&roundtrip=false&geometries=geojson"
-    )
-    data = _http_get_json(url)
-    trip = (data.get('trips') or [None])[0]
-    coords = (trip or {}).get('geometry', {}).get('coordinates', [])
-    duration = (trip or {}).get('duration')
-    waypoints = data.get('waypoints') or []
-    ordered = [(w['location'][1], w['location'][0]) for w in waypoints] if waypoints else points
-    return coords, ordered, float(duration) if isinstance(duration, (int,float)) else None
-
-
-# =========================
-# Routing endpoints
-# =========================
-
-@app.post('/eta')
-def eta(req: EtaRequest):
-    origin = (req.origin.lat, req.origin.lon)
-    destination = (req.destination.lat, req.destination.lon)
-    mode = req.mode
-    # Try ML router first, then OSRM
-    if HAS_ROUTER:
-        try:
-            seconds = ml_eta(origin, destination, mode)  # type: ignore
-            if isinstance(seconds, (int, float)) and seconds >= 0:
-                return {"seconds": float(seconds)}
-        except Exception:
-            pass
-    try:
-        profile = _mode_to_osrm(mode)
-        _, duration = _osrm_route(profile, origin, destination)
-        return {"seconds": float(duration) if duration is not None else None}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"ETA failed: {e}")
-
-
-@app.post('/route')
-def route(req: RouteRequest):
-    origin = (req.origin.lat, req.origin.lon)
-    destination = (req.destination.lat, req.destination.lon)
-    stops = [(s.lat, s.lon) for s in (req.stops or [])]
-    mode = req.mode
-    if HAS_ROUTER:
-        try:
-            geom, duration = ml_route(origin, destination, mode, stops if stops else None)  # type: ignore
-            # Expect geom as list of (lat,lon) or (lon,lat); try to normalize to [lon,lat]
-            coords: List[List[float]] = []
-            for g in geom or []:
-                if isinstance(g, (list, tuple)) and len(g) >= 2:
-                    a, b = float(g[0]), float(g[1])
-                    # If looks like lat,lon (lat within [-90,90]), convert to lon,lat
-                    if -90.0 <= a <= 90.0 and -180.0 <= b <= 180.0:
-                        coords.append([b, a])
-                    else:
-                        coords.append([a, b])
-            return {"geometry": coords, "durationSeconds": float(duration) if duration is not None else None}
-        except Exception:
-            pass
-    try:
-        profile = _mode_to_osrm(mode)
-        if stops:
-            pts = [origin] + stops + [destination]
-            coords, _, duration = _osrm_trip(profile, pts)
-        else:
-            coords, duration = _osrm_route(profile, origin, destination)
-        return {"geometry": coords, "durationSeconds": float(duration) if duration is not None else None}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Route failed: {e}")
-
-
-@app.post('/optimize')
-def optimize(req: OptimizeRequest):
-    origin = (req.origin.lat, req.origin.lon)
-    destination = (req.destination.lat, req.destination.lon)
-    stops = [(s.lat, s.lon) for s in req.stops]
-    mode = req.mode
-    if HAS_ROUTER:
-        try:
-            ordered_pts, geom, duration = ml_optimize(origin, stops, destination, mode)  # type: ignore
-            ordered_latlon = [
-                {"latitude": float(lat), "longitude": float(lon)} for (lat, lon) in (ordered_pts or [])
-            ]
-            coords: Optional[List[List[float]]] = None
-            if geom is not None:
-                coords = []
-                for g in geom:
-                    if isinstance(g, (list, tuple)) and len(g) >= 2:
-                        a, b = float(g[0]), float(g[1])
-                        if -90.0 <= a <= 90.0 and -180.0 <= b <= 180.0:
-                            coords.append([b, a])
-                        else:
-                            coords.append([a, b])
-            return {
-                "ordered": ordered_latlon,
-                "geometry": coords or [],
-                "durationSeconds": float(duration) if duration is not None else None,
-            }
-        except Exception:
-            pass
-    try:
-        profile = _mode_to_osrm(mode)
-        pts = [origin] + stops + [destination]
-        coords, ordered_pts, duration = _osrm_trip(profile, pts)
-        ordered_latlon = [
-            {"latitude": float(lat), "longitude": float(lon)} for (lat, lon) in ordered_pts
-        ]
-        return {
-            "ordered": ordered_latlon,
-            "geometry": coords,
-            "durationSeconds": float(duration) if duration is not None else None,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Optimize failed: {e}")
+    print(f"Returning recommendations: {results}")  # Log the results
+    return {"recommendations": results}
