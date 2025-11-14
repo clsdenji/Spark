@@ -7,13 +7,8 @@ import Constants from "expo-constants";
 
 // Prefer an environment override for real devices: set EXPO_PUBLIC_API_URL in app.json
 const ENV_URL = process.env.EXPO_PUBLIC_API_URL || Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_URL;
-const DEV_BASE_URL =
-  ENV_URL ||
-  (Platform.OS === "android"
-    ? "http://10.0.2.2:8000"   // Android emulator talks to your PC
-    : "http://127.0.0.1:8000"); // iOS simulator / web
-
-// TODO: change to your deployed API URL when online
+// Use deployed Render URL as the default for local/dev when no env override is present
+const DEV_BASE_URL = ENV_URL || "https://spark-e73i.onrender.com";
 const PROD_BASE_URL = DEV_BASE_URL;
 
 const API_BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
