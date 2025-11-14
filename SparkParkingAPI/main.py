@@ -209,7 +209,7 @@ def load_parking_excel(path: str = "../PARKING.xlsx") -> List[Dict[str, Any]]:
     return all_rows
 
 
-PARKINGS: List[Dict[str, Any]] = load_parking_excel("PARKING.xlsx")
+PARKINGS: List[Dict[str, Any]] = load_parking_excel("../PARKING.xlsx")
 
 
 # =========================
