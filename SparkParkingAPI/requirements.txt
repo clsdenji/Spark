@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-scikit-learn
-joblib
-numpy
-pandas
-# add any other dependencies your API uses (e.g. sqlalchemy, asyncpg, redis, etc.)

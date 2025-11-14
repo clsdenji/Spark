@@ -1,31 +1,28 @@
-# Dockerfile for SparkParkingAPI (FastAPI + models)
+# SparkParkingAPI Dockerfile (improved)
 FROM python:3.11-slim
 
-# Don't write .pyc files and buffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
 
 WORKDIR /app
 
-# copy requirements first for better caching
+# Copy requirements (path assumes build context is repo root)
 COPY SparkParkingAPI/requirements.txt /app/requirements.txt
 
-# Install build deps (scikit-learn / numpy sometimes need compilers) and pip deps
+# Install build deps, upgrade pip, install python deps, then remove build deps
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential gcc \
-    && pip install --no-cache-dir -r /app/requirements.txt \
-    && apt-get remove -y build-essential gcc \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends build-essential gcc ca-certificates \
+  && python -m pip install --upgrade pip setuptools wheel \
+  && pip install --no-cache-dir -r /app/requirements.txt \
+  && apt-get remove -y build-essential gcc \
+  && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/* /root/.cache/pip
 
-# Copy application source (models/joblib files should be in SparkParkingAPI/ so they get included)
+# Copy app code & model files (assumes SparkParkingAPI/ exists in build context)
 COPY SparkParkingAPI/ /app/
 
-# Render (and many hosts) provide PORT via env var. Default 8000 if not provided.
-ENV PORT=8000
 EXPOSE 8000
 
-# Use shell form to allow env var expansion for PORT
+# Start uvicorn on the PORT env var provided by Render
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
-
-
