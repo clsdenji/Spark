@@ -303,14 +303,24 @@ def recommend(req: ParkingRequest, top_k: int = 5):
             lat = float(p["lat"])
             lng = float(p["lng"])
             dist_km = haversine_km(req.user_lat, req.user_lng, lat, lng)
-            # Other feature processing...
+            
+            # Ensure all features are processed correctly
+            opening = p.get("opening", None)
+            closing = p.get("closing", None)
+            open_now = compute_open_now(opening, closing, req.time_of_day)
+
+            cctvs = yn_to_int(p.get("cctvs_raw", p.get("CCTVS", "")))
+            guards = yn_to_int(p.get("guards_raw", p.get("GUARDS", "")))
+            initial_rate = rate_to_float(p.get("initial_rate_raw", p.get("INITIAL RATE", "")))
+            pwd_discount = discount_to_int(p.get("discount_raw", p.get("PWD/SC DISCOUNT", "")))
+            street_parking = yn_to_int(p.get("street_raw", p.get("STREET PARKING", "")))
 
             feature_rows.append([dist_km, open_now, cctvs, guards, initial_rate, pwd_discount, street_parking])
             parking_info.append({
-                "name": p["name"],
+                "name": p.get("name"),
                 "lat": lat,
                 "lng": lng,
-                "address": p["address"]
+                "address": p.get("address")
             })
         except Exception as e:
             print(f"Error processing parking {p['name']}: {e}")  # Log errors while processing parking data
